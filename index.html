@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>예산안 관리</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      color: #1e293b;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      color: white;
+      padding: 24px 32px;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+
+    .main-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 28px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* 카드 공통 */
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+
+    /* 월급 섹션 */
+    .salary-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .salary-input-wrap {
+      display: flex;
+      align-items: center;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+      flex: 1;
+      transition: border-color 0.2s;
+    }
+
+    .salary-input-wrap:focus-within {
+      border-color: #3b82f6;
+    }
+
+    .salary-input-wrap span {
+      padding: 0 14px;
+      background: #f8fafc;
+      color: #64748b;
+      font-size: 1rem;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      border-right: 1px solid #e2e8f0;
+    }
+
+    #salaryInput {
+      border: none;
+      outline: none;
+      padding: 0 14px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e293b;
+      height: 48px;
+      width: 100%;
+      background: transparent;
+    }
+
+    .btn-set {
+      height: 48px;
+      padding: 0 20px;
+      background: #1e40af;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-set:hover { background: #1d3a9e; }
+
+    /* 잔액 현황 카드 */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .summary-item {
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .summary-item .label {
+      font-size: 0.78rem;
+      color: #64748b;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .summary-item .amount {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .summary-item.total .amount { color: #1e40af; }
+    .summary-item.used .amount  { color: #ef4444; }
+    .summary-item.remain .amount { color: #10b981; }
+    .summary-item.remain.negative .amount { color: #ef4444; }
+
+    /* 진행바 */
+    .progress-wrap {
+      margin-top: 16px;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar-fill.over { background: linear-gradient(90deg, #ef4444, #f97316); }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* 항목 추가 폼 */
+    .add-form {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .form-group input {
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0 14px;
+      height: 44px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+      color: #1e293b;
+    }
+
+    .form-group input:focus { border-color: #3b82f6; }
+
+    .form-group.purpose { flex: 2; }
+    .form-group.amount  { flex: 1; }
+
+    .btn-add {
+      height: 44px;
+      padding: 0 20px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+
+    .btn-add:hover { background: #059669; }
+
+    /* 항목 리스트 */
+    .item-list {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      padding: 32px 0;
+    }
+
+    .budget-item {
+      display: flex;
+      align-items: center;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 14px 16px;
+      gap: 12px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .item-num {
+      width: 26px;
+      height: 26px;
+      background: #dbeafe;
+      color: #1e40af;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .item-purpose {
+      flex: 1;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .item-amount {
+      font-weight: 700;
+      color: #ef4444;
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+
+    .item-pct {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      width: 42px;
+      text-align: right;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #cbd5e1;
+      font-size: 1rem;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-delete:hover { color: #ef4444; background: #fee2e2; }
+
+    /* 하단 액션 버튼 */
+    .action-bar {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn-action {
+      height: 44px;
+      padding: 0 22px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-save {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .btn-save:hover { background: #e2e8f0; }
+
+    .btn-reset {
+      background: #fee2e2;
+      color: #ef4444;
+    }
+
+    .btn-reset:hover { background: #fecaca; }
+
+    .btn-excel {
+      background: #166534;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-excel:hover { background: #14532d; }
+
+    /* 토스트 알림 */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: #1e293b;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* 연도/월 선택 */
+    .period-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .period-row select {
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.88rem;
+      color: #1e293b;
+      outline: none;
+      cursor: pointer;
+      background: #f8fafc;
+    }
+
+    .period-row select:focus { border-color: #3b82f6; }
+
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .add-form { flex-wrap: wrap; }
+      .form-group.purpose, .form-group.amount { flex: 1 1 100%; }
+      .btn-add { width: 100%; justify-content: center; }
+      .action-bar { flex-direction: column; }
+      .btn-action { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>예산안 관리</h1>
+  <p>월급 기반 지출 계획을 세우고 Excel로 내보내세요</p>
+</header>
+
+<div class="main-container">
+
+  <!-- 기간 선택 + 월급 입력 -->
+  <div class="card">
+    <div class="card-title">기간 설정</div>
+    <div class="period-row">
+      <select id="yearSelect"></select>
+      <select id="monthSelect"></select>
+    </div>
+    <div class="card-title">월급 입력</div>
+    <div class="salary-section">
+      <div class="salary-input-wrap">
+        <span>₩</span>
+        <input type="number" id="salaryInput" placeholder="월급을 입력하세요" min="0" step="10000" />
+      </div>
+      <button class="btn-set" onclick="setSalary()">설정</button>
+    </div>
+  </div>
+
+  <!-- 잔액 현황 -->
+  <div class="card">
+    <div class="card-title">잔액 현황</div>
+    <div class="summary-grid">
+      <div class="summary-item total">
+        <div class="label">월급</div>
+        <div class="amount" id="displaySalary">₩0</div>
+      </div>
+      <div class="summary-item used">
+        <div class="label">지출 예산</div>
+        <div class="amount" id="displayUsed">₩0</div>
+      </div>
+      <div class="summary-item remain" id="remainCard">
+        <div class="label">잔액</div>
+        <div class="amount" id="displayRemain">₩0</div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-label">
+        <span>0%</span>
+        <span id="progressPct">0% 사용</span>
+        <span>100%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 예산 항목 추가 -->
+  <div class="card">
+    <div class="card-title">예산 항목 추가</div>
+    <div class="add-form">
+      <div class="form-group purpose">
+        <label>예산 목적</label>
+        <input type="text" id="purposeInput" placeholder="예) 식비, 교통비, 저축..." />
+      </div>
+      <div class="form-group amount">
+        <label>금액 (원)</label>
+        <input type="number" id="amountInput" placeholder="0" min="0" step="1000" />
+      </div>
+      <button class="btn-add" onclick="addItem()">+ 추가</button>
+    </div>
+
+    <div class="item-list" id="itemList">
+      <div class="empty-state" id="emptyState">아직 추가된 예산 항목이 없습니다.</div>
+    </div>
+  </div>
+
+  <!-- 액션 버튼 -->
+  <div class="action-bar">
+    <button class="btn-action btn-reset" onclick="resetAll()">초기화</button>
+    <button class="btn-action btn-save" onclick="saveData()">💾 저장</button>
+    <button class="btn-action btn-excel" onclick="exportExcel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="8" y1="13" x2="16" y2="13"/>
+        <line x1="8" y1="17" x2="16" y2="17"/>
+        <line x1="10" y1="9" x2="8" y2="9"/>
+      </svg>
+      Excel 내보내기
+    </button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── 상태 ──────────────────────────────────────────────
+  let salary = 0;
+  let items  = [];   // { id, purpose, amount }
+
+  // ── 초기화 ────────────────────────────────────────────
+  (function init() {
+    buildPeriodSelectors();
+    loadData();
+    renderAll();
+
+    document.getElementById('purposeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('amountInput').focus();
+    });
+    document.getElementById('amountInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addItem();
+    });
+  })();
+
+  function buildPeriodSelectors() {
+    const now   = new Date();
+    const ysel  = document.getElementById('yearSelect');
+    const msel  = document.getElementById('monthSelect');
+
+    for (let y = now.getFullYear() - 3; y <= now.getFullYear() + 2; y++) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y + '년';
+      if (y === now.getFullYear()) opt.selected = true;
+      ysel.appendChild(opt);
+    }
+    for (let m = 1; m <= 12; m++) {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m + '월';
+      if (m === now.getMonth() + 1) opt.selected = true;
+      msel.appendChild(opt);
+    }
+
+    ysel.addEventListener('change', loadData);
+    msel.addEventListener('change', loadData);
+  }
+
+  function periodKey() {
+    return `budget_${document.getElementById('yearSelect').value}_${document.getElementById('monthSelect').value}`;
+  }
+
+  // ── 데이터 저장 / 불러오기 ──────────────────────────
+  function saveData() {
+    const data = { salary, items };
+    localStorage.setItem(periodKey(), JSON.stringify(data));
+    showToast('저장되었습니다.');
+  }
+
+  function loadData() {
+    const raw = localStorage.getItem(periodKey());
+    if (raw) {
+      try {
+        const data = JSON.parse(raw);
+        salary = data.salary || 0;
+        items  = data.items  || [];
+      } catch {
+        salary = 0; items = [];
+      }
+    } else {
+      salary = 0; items = [];
+    }
+    document.getElementById('salaryInput').value = salary || '';
+    renderAll();
+  }
+
+  // ── 월급 설정 ─────────────────────────────────────────
+  function setSalary() {
+    const val = parseFloat(document.getElementById('salaryInput').value);
+    if (isNaN(val) || val < 0) { showToast('올바른 금액을 입력해주세요.'); return; }
+    salary = val;
+    renderAll();
+    showToast('월급이 설정되었습니다.');
+  }
+
+  // ── 항목 추가 ─────────────────────────────────────────
+  function addItem() {
+    const purpose = document.getElementById('purposeInput').value.trim();
+    const amount  = parseFloat(document.getElementById('amountInput').value);
+
+    if (!purpose) { showToast('예산 목적을 입력해주세요.'); return; }
+    if (isNaN(amount) || amount <= 0) { showToast('올바른 금액을 입력해주세요.'); return; }
+
+    items.push({ id: Date.now(), purpose, amount });
+
+    document.getElementById('purposeInput').value = '';
+    document.getElementById('amountInput').value  = '';
+    document.getElementById('purposeInput').focus();
+
+    renderAll();
+  }
+
+  // ── 항목 삭제 ─────────────────────────────────────────
+  function deleteItem(id) {
+    items = items.filter(i => i.id !== id);
+    renderAll();
+  }
+
+  // ── 초기화 ────────────────────────────────────────────
+  function resetAll() {
+    if (!confirm('모든 데이터를 초기화하시겠습니까?')) return;
+    salary = 0;
+    items  = [];
+    document.getElementById('salaryInput').value = '';
+    localStorage.removeItem(periodKey());
+    renderAll();
+    showToast('초기화되었습니다.');
+  }
+
+  // ── 렌더링 ────────────────────────────────────────────
+  function renderAll() {
+    const totalUsed   = items.reduce((s, i) => s + i.amount, 0);
+    const remain      = salary - totalUsed;
+    const pct         = salary > 0 ? Math.min((totalUsed / salary) * 100, 100) : 0;
+    const over        = remain < 0;
+
+    document.getElementById('displaySalary').textContent = formatWon(salary);
+    document.getElementById('displayUsed').textContent   = formatWon(totalUsed);
+    document.getElementById('displayRemain').textContent = formatWon(remain);
+
+    const remainCard = document.getElementById('remainCard');
+    if (over) remainCard.classList.add('negative');
+    else      remainCard.classList.remove('negative');
+
+    const fill = document.getElementById('progressFill');
+    fill.style.width = pct + '%';
+    if (over) fill.classList.add('over');
+    else      fill.classList.remove('over');
+
+    document.getElementById('progressPct').textContent = pct.toFixed(1) + '% 사용';
+
+    renderList(totalUsed);
+  }
+
+  function renderList(totalUsed) {
+    const list  = document.getElementById('itemList');
+    const empty = document.getElementById('emptyState');
+
+    if (items.length === 0) {
+      list.innerHTML = '';
+      list.appendChild(empty);
+      return;
+    }
+
+    list.innerHTML = '';
+    items.forEach((item, idx) => {
+      const pct = totalUsed > 0 ? ((item.amount / totalUsed) * 100).toFixed(1) : 0;
+      const div = document.createElement('div');
+      div.className = 'budget-item';
+      div.innerHTML = `
+        <div class="item-num">${idx + 1}</div>
+        <div class="item-purpose">${escHtml(item.purpose)}</div>
+        <div class="item-pct">${pct}%</div>
+        <div class="item-amount">-${formatWon(item.amount)}</div>
+        <button class="btn-delete" onclick="deleteItem(${item.id})" title="삭제">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  // ── Excel 내보내기 ────────────────────────────────────
+  function exportExcel() {
+    const year  = document.getElementById('yearSelect').value;
+    const month = document.getElementById('monthSelect').value;
+
+    const totalUsed = items.reduce((s, i) => s + i.amount, 0);
+    const remain    = salary - totalUsed;
+
+    const wsData = [
+      [`${year}년 ${month}월 예산안`],
+      [],
+      ['월급', salary],
+      ['총 지출 예산', totalUsed],
+      ['잔액', remain],
+      [],
+      ['번호', '예산 목적', '금액 (원)', '비율 (%)'],
+    ];
+
+    items.forEach((item, idx) => {
+      const pct = totalUsed > 0 ? ((item.amount / totalUsed) * 100).toFixed(1) : 0;
+      wsData.push([idx + 1, item.purpose, item.amount, Number(pct)]);
+    });
+
+    wsData.push([]);
+    wsData.push(['', '합계', totalUsed, 100]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // 열 너비 설정
+    ws['!cols'] = [{ wch: 6 }, { wch: 20 }, { wch: 16 }, { wch: 10 }];
+
+    // 제목 셀 병합
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+    XLSX.utils.book_append_sheet(wb, ws, `${year}-${String(month).padStart(2,'0')}`);
+
+    const filename = `예산안_${year}년_${month}월.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast(`"${filename}" 파일로 저장되었습니다.`);
+  }
+
+  // ── 유틸 ─────────────────────────────────────────────
+  function formatWon(n) {
+    return '₩' + Math.abs(n).toLocaleString('ko-KR') + (n < 0 ? ' 초과' : '');
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>
