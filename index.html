@@ -307,9 +307,20 @@ let dndIsBudget = true;
 // ═══════════════════════════════════════
 //  COMPUTED
 // ═══════════════════════════════════════
-const budgetTotal   = () => budgetItems.reduce((s,i)=>s+i.amount,0);
-const actualTotal   = () => budgetItems.reduce((s,i)=>s+(expenseAmounts[i.id]||0),0);
-const unexpTotal    = () => unexpectedExpenses.reduce((s,i)=>s+i.amount,0);
+// 하위 항목이 있는 경우 자신의 amount 대신 하위 합산을 반환
+function isLeaf(id){ return !budgetItems.some(i=>i.parentId===id); }
+function getComputedAmount(id){
+  if(isLeaf(id)) return budgetItems.find(i=>i.id===id)?.amount||0;
+  return budgetItems.filter(i=>i.parentId===id).reduce((s,c)=>s+getComputedAmount(c.id),0);
+}
+function getActualForItem(id){
+  if(isLeaf(id)) return expenseAmounts[id]||0;
+  return budgetItems.filter(i=>i.parentId===id).reduce((s,c)=>s+getActualForItem(c.id),0);
+}
+// 루트 항목들의 합산 (= 전체 리프 합산과 동일)
+const budgetTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+getComputedAmount(i.id),0);
+const actualTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+getActualForItem(i.id),0);
+const unexpTotal  = () => unexpectedExpenses.reduce((s,i)=>s+i.amount,0);
 
 function getCarryover() {
   const y = +document.getElementById('yearSel').value;
@@ -320,7 +331,10 @@ function getCarryover() {
   try {
     const d = JSON.parse(raw);
     const bi = d.budgetItems||[], ea = d.expenseAmounts||{}, ue = d.unexpectedExpenses||[];
-    const act   = bi.reduce((s,i)=>s+(ea[i.id]||0),0);
+    // 전월도 동일한 리프 기반 계산 적용
+    function pLeaf(id){ return !bi.some(i=>i.parentId===id); }
+    function pActual(id){ return pLeaf(id)?(ea[id]||0):bi.filter(i=>i.parentId===id).reduce((s,c)=>s+pActual(c.id),0); }
+    const act   = bi.filter(i=>i.parentId===null).reduce((s,i)=>s+pActual(i.id),0);
     const unexp = ue.reduce((s,i)=>s+i.amount,0);
     return (d.salary||0) - act - unexp;
   } catch { return 0; }
@@ -451,12 +465,18 @@ function startEdit(id, isBudget){ editId=id; editType=isBudget?'budget':'unexp';
 
 function saveEdit(id){
   const p=document.getElementById(`ep-${id}`).value.trim();
-  const a=parseFloat(document.getElementById(`ea-${id}`).value);
   if(!p){toast('목적을 입력해주세요.');return;}
-  if(isNaN(a)||a<=0){toast('올바른 금액을 입력해주세요.');return;}
   const arr = editType==='budget' ? budgetItems : unexpectedExpenses;
   const item = arr.find(i=>i.id===id);
-  if(item){item.purpose=p; item.amount=a;}
+  if(!item) return;
+  item.purpose=p;
+  // 리프 항목 또는 예상외 항목만 금액 수정 가능 (상위는 하위 합산이므로 수정 불필요)
+  const amtEl=document.getElementById(`ea-${id}`);
+  if(amtEl){
+    const a=parseFloat(amtEl.value);
+    if(isNaN(a)||a<=0){toast('올바른 금액을 입력해주세요.');return;}
+    item.amount=a;
+  }
   editId=null; renderAll(); toast('수정되었습니다.');
 }
 function cancelEdit(){ editId=null; renderList(); }
@@ -466,12 +486,25 @@ function cancelEdit(){ editId=null; renderList(); }
 // ═══════════════════════════════════════
 function updateExpense(id, val){
   const v=parseFloat(val); expenseAmounts[id]=(isNaN(v)||v<0)?0:v;
-  // update this row's remain cell
+  // 리프 항목의 잔액 셀 업데이트
   const item=budgetItems.find(i=>i.id===id);
   if(item){
-    const r=item.amount-expenseAmounts[id];
+    const computed=getComputedAmount(id);
+    const r=computed-expenseAmounts[id];
     const el=document.getElementById(`er-${id}`);
     if(el){el.textContent=fw(r); el.className='exp-remain'+(r<0?' neg':'');}
+    // 상위 항목들도 집계 업데이트
+    let pid=item.parentId;
+    while(pid!==null){
+      const par=budgetItems.find(i=>i.id===pid);
+      if(!par)break;
+      const pAmt=getComputedAmount(pid), pAct=getActualForItem(pid), pRem=pAmt-pAct;
+      const actEl=document.getElementById(`ea-agg-${pid}`);
+      const remEl=document.getElementById(`er-${pid}`);
+      if(actEl){actEl.textContent=fw(pAct);}
+      if(remEl){remEl.textContent=fw(pRem); remEl.className='exp-remain'+(pRem<0?' neg':'');}
+      pid=par.parentId;
+    }
   }
   refreshExpTotals(); renderSummary();
 }
@@ -480,10 +513,9 @@ function refreshExpTotals(){
   const co=getCarryover();
   const tB=budgetTotal(), tA=actualTotal(), tU=unexpTotal();
   const tAU=tA+tU, finalR=salary+co-tAU;
-  const elA=document.getElementById('etA'), elF=document.getElementById('efA'), elCo=document.getElementById('eCo');
+  const elA=document.getElementById('etA'), elF=document.getElementById('efA');
   if(elA){elA.textContent=fw(tAU);}
   if(elF){elF.textContent=fw(finalR); elF.className='exp-final-amt'+(finalR<0?' neg':'');}
-  if(elCo&&co!==0){elCo.textContent=fw(co);}
 }
 
 // ═══════════════════════════════════════
@@ -597,8 +629,11 @@ function renderModeUI(){
   document.getElementById('listTitle').textContent = ib?'예산 항목':'지출 내역';
   document.getElementById('listCnt').textContent   = ib ? budgetItems.length+'개' : budgetItems.length+unexpectedExpenses.length+'개';
 
-  if(!ib){
-    const co=getCarryover();
+  // 이월 표시: 두 모드 모두에서, 이월이 있을 때만 표시
+  const co=getCarryover();
+  const coSec=document.getElementById('coSec');
+  coSec.style.display = co!==0 ? '' : 'none';
+  if(co!==0){
     document.getElementById('coVal').textContent=fw(co);
     document.getElementById('coBox').className='carryover-box'+(co<0?' neg':'');
   }
@@ -607,23 +642,24 @@ function renderModeUI(){
 function renderSummary(){
   const ib=mode==='budget';
   const co=getCarryover();
+  const avail=salary+co; // 이월 자동 합산
   let items, pctUsed, over;
 
   if(ib){
-    const avail=salary, used=budgetTotal(), remain=salary-used;
+    const used=budgetTotal(), remain=avail-used;
     pctUsed=avail>0?Math.min(used/avail*100,100):0; over=remain<0;
     items=[
-      {l:'월급',    v:salary,    c:'c-blue'},
-      {l:'이월',    v:co,        c:co>=0?'c-blue':'c-red'},
-      {l:'예산 지출',v:used,     c:'c-red'},
-      {l:'잔액',    v:remain,    c:remain<0?'c-red':'c-green'},
+      {l:co!==0?'월급+이월':'월급', v:avail,  c:'c-blue'},
+      {l:'예산 지출',               v:used,   c:'c-red'},
+      {l:'잔액',                    v:remain, c:remain<0?'c-red':'c-green'},
+      {l:'예산 비율', v:avail>0?(used/avail*100).toFixed(1)+'%':'0%', c:'c-blue', isText:true},
     ];
   } else {
     const tA=actualTotal(), tU=unexpTotal(), total=tA+tU;
-    const avail=salary+co, remain=avail-total;
+    const remain=avail-total;
     pctUsed=avail>0?Math.min(total/avail*100,100):0; over=remain<0;
     items=[
-      {l:'사용 가능',   v:avail,  c:'c-blue'},
+      {l:co!==0?'사용가능(이월포함)':'사용 가능', v:avail,  c:'c-blue'},
       {l:'실제 지출',   v:tA,     c:'c-red'},
       {l:'예상외 지출', v:tU,     c:'c-purple'},
       {l:'최종 잔액',   v:remain, c:remain<0?'c-red':'c-purple'},
@@ -656,20 +692,27 @@ function renderBudgetList(){
   }
   const total=budgetTotal();
   list.innerHTML=flat.map(({item,depth},idx)=>{
-    const pct=total>0?((item.amount/total)*100).toFixed(1):'0.0';
+    const leaf=isLeaf(item.id);
+    const dispAmt=getComputedAmount(item.id); // 리프: 자신 금액, 상위: 하위 합산
+    const pct=total>0?((dispAmt/total)*100).toFixed(1):'0.0';
     const indent=depth*24;
     if(item.id===editId){
       return `<div class="tree-item editing" style="padding-left:${indent+12}px">
         <div class="edit-form">
           <input class="ei ei-p" id="ep-${item.id}" value="${esc(item.purpose)}"
             onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
-          <input class="ei ei-a" id="ea-${item.id}" type="number" value="${item.amount}"
-            onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
+          ${leaf
+            ? `<input class="ei ei-a" id="ea-${item.id}" type="number" value="${item.amount}"
+                onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>`
+            : `<div style="font-size:.74rem;color:#64748b;padding:0 8px;white-space:nowrap;">합산: ${fw(dispAmt)}</div>`
+          }
           <button class="btn-ok" onclick="saveEdit(${item.id})">저장</button>
           <button class="btn-cx" onclick="cancelEdit()">취소</button>
         </div>
       </div>`;
     }
+    const amtStyle=leaf?'':'color:#64748b;font-style:italic;';
+    const amtLabel=leaf?`-${fw(dispAmt)}`:`합=${fw(dispAmt)}`;
     return `<div class="tree-item" style="padding-left:${indent+4}px"
       id="ti-${item.id}" draggable="true"
       ondragstart="onDragStart(event,${item.id},true)"
@@ -679,9 +722,9 @@ function renderBudgetList(){
       ondrop="onDrop(event,${item.id},true)">
       <div class="drag-handle">${dragIcon()}</div>
       <div class="item-num">${idx+1}</div>
-      <div class="item-purpose" title="${esc(item.purpose)}">${esc(item.purpose)}</div>
+      <div class="item-purpose" title="${esc(item.purpose)}" style="${!leaf?'font-weight:700;':''}">${esc(item.purpose)}</div>
       <div class="item-pct">${pct}%</div>
-      <div class="item-amt">-${fw(item.amount)}</div>
+      <div class="item-amt" style="${amtStyle}">${amtLabel}</div>
       <div style="display:flex;gap:3px;flex-shrink:0">
         <button class="btn-ico edit" onclick="startEdit(${item.id},true)" title="수정">${editIcon()}</button>
         <button class="btn-ico del"  onclick="deleteItem(${item.id},true)" title="삭제">${delIcon()}</button>
@@ -758,12 +801,26 @@ function renderExpRow({type,item,depth,draggable}, idx){
   const isBudget=type==='budget';
 
   if(isBudget){
+    const leaf=isLeaf(item.id);
+    const computedAmt=getComputedAmount(item.id);
+    if(!leaf){
+      // 상위 항목: 하위 합산 집계 표시 (입력 없음)
+      const aggActual=getActualForItem(item.id);
+      const aggRemain=computedAmt-aggActual;
+      return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;background:#f1f5f9;">
+        <div class="item-num">${idx}</div>
+        <div class="exp-name" style="font-weight:700">${esc(item.purpose)}</div>
+        <div class="exp-bamt">${fw(computedAmt)}</div>
+        <div class="exp-bamt" id="ea-agg-${item.id}" style="color:#ef4444">${fw(aggActual)}</div>
+        <div class="exp-remain${aggRemain<0?' neg':''}" id="er-${item.id}">${fw(aggRemain)}</div>
+      </div>`;
+    }
     const actual=expenseAmounts[item.id]||0;
-    const remain=item.amount-actual;
+    const remain=computedAmt-actual;
     return `<div class="exp-row exp-item" style="padding-left:${indent+2}px">
       <div class="expense-num item-num">${idx}</div>
       <div class="exp-name">${esc(item.purpose)}</div>
-      <div class="exp-bamt">${fw(item.amount)}</div>
+      <div class="exp-bamt">${fw(computedAmt)}</div>
       <input class="exp-input" type="number" value="${actual||''}" placeholder="0" min="0" step="1000"
         oninput="updateExpense(${item.id},this.value)"/>
       <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
@@ -802,9 +859,12 @@ function exportExcel(){
     [`${year}년 ${month}월 예산안`],[],
     ['월급',salary],['이월',co],['사용 가능',salary+co],
     ['총 예산 지출',budgetTotal()],['예산 잔액',salary+co-budgetTotal()],[],
-    ['번호','예산 목적','레벨','금액(원)'],
-    ...flat.map(({item,depth},i)=>[i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount]),
-    [],['','합계','',budgetTotal()],
+    ['번호','예산 목적','레벨','금액(원)','비고'],
+    ...flat.map(({item,depth},i)=>{
+      const leaf=isLeaf(item.id), disp=getComputedAmount(item.id);
+      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',disp,leaf?'':'하위합산'];
+    }),
+    [],['','합계','',budgetTotal(),''],
   ];
   const ws1=XLSX.utils.aoa_to_sheet(bData);
   ws1['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14}];
@@ -820,8 +880,9 @@ function exportExcel(){
     ['번호','항목','레벨','예산','실제 지출','잔액'],
     ...rows.map(({type,item,depth},i)=>{
       if(type==='budget'){
-        const act=expenseAmounts[item.id]||0;
-        return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,act,item.amount-act];
+        const leaf=isLeaf(item.id), disp=getComputedAmount(item.id);
+        const act=leaf?(expenseAmounts[item.id]||0):getActualForItem(item.id);
+        return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',disp,act,disp-act];
       } else {
         return [i+1,' '.repeat(depth*2)+'[예상외]'+item.purpose,'—','—',item.amount,'—'];
       }
