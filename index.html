@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
@@ -367,15 +368,7 @@
 // ═══════════════════════════════════════
 //  FIREBASE
 // ═══════════════════════════════════════
-firebase.initializeApp({
-  apiKey: "AIzaSyDUdHKiofiwGs-cIDvI7F2Vqk9gkUdMl-g",
-  authDomain: "budget-90486.firebaseapp.com",
-  databaseURL: "https://budget-90486-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "budget-90486",
-  storageBucket: "budget-90486.firebasestorage.app",
-  messagingSenderId: "978513422803",
-  appId: "1:978513422803:web:63102e48b1f18d0303a726"
-});
+firebase.initializeApp(window.FIREBASE_CONFIG);
 const _db   = firebase.database();
 const _auth = firebase.auth();
 let _currentUser = null;
