@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
@@ -254,8 +255,25 @@
     <h1>수입·예산 관리</h1>
     <p>수입 계획 · 예산안 · 계층 구조 · 이월 · 실제 지출 비교</p>
   </div>
-  <div id="syncStatus" style="background:#fef9c3;color:#92400e">⏳ 연결 중...</div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div id="userInfo" style="display:flex;align-items:center;gap:8px"></div>
+    <div id="syncStatus" style="background:#fef9c3;color:#92400e">⏳ 연결 중...</div>
+  </div>
 </header>
+
+<!-- 로그인 오버레이 -->
+<div id="loginOverlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#065f46,#059669);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:24px;padding:20px">
+  <div style="text-align:center;color:white">
+    <div style="font-size:3.5rem;margin-bottom:12px">💰</div>
+    <h1 style="font-size:1.6rem;font-weight:700;margin-bottom:8px">수입·예산 관리</h1>
+    <p style="opacity:.8;font-size:.9rem;line-height:1.6">내 재정을 스마트하게 관리하고<br>모든 기기에서 동기화하세요</p>
+  </div>
+  <button onclick="signInWithGoogle()" style="display:flex;align-items:center;gap:12px;background:white;border:none;padding:14px 28px;border-radius:14px;cursor:pointer;font-size:.95rem;font-weight:600;color:#1e293b;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:transform .15s" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    Google 계정으로 로그인
+  </button>
+  <p style="color:rgba(255,255,255,.55);font-size:.72rem;text-align:center">각자의 Google 계정으로 로그인하면<br>완전히 분리된 개인 데이터가 생성됩니다</p>
+</div>
 
 <div class="app-layout">
 
@@ -358,8 +376,41 @@ firebase.initializeApp({
   messagingSenderId: "978513422803",
   appId: "1:978513422803:web:63102e48b1f18d0303a726"
 });
-const _db = firebase.database();
+const _db   = firebase.database();
+const _auth = firebase.auth();
+let _currentUser = null;
 let _fbUnsub = null;
+
+// Firebase 데이터 경로 (로그인한 사용자 UID 기반으로 분리)
+function fbRef(key){ return _db.ref(`budgetApp/${_currentUser.uid}/${key}`); }
+
+function signInWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  _auth.signInWithPopup(provider).catch(err=>toast('로그인 실패: '+err.message));
+}
+function signOutUser(){
+  if(!confirm('로그아웃 하시겠습니까?'))return;
+  if(_fbUnsub){_fbUnsub();_fbUnsub=null;}
+  _auth.signOut();
+}
+
+_auth.onAuthStateChanged(user=>{
+  _currentUser=user;
+  const overlay=document.getElementById('loginOverlay');
+  const ui=document.getElementById('userInfo');
+  if(user){
+    overlay.style.display='none';
+    ui.innerHTML=`
+      ${user.photoURL?`<img src="${user.photoURL}" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`:'' }
+      <span style="font-size:.73rem;opacity:.85;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${user.displayName||user.email}</span>
+      <button onclick="signOutUser()" style="font-size:.68rem;background:rgba(255,255,255,.2);border:none;color:white;padding:3px 9px;border-radius:6px;cursor:pointer;white-space:nowrap">로그아웃</button>`;
+    loadData();
+  } else {
+    overlay.style.display='flex';
+    ui.innerHTML='';
+    incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
+  }
+});
 
 function setSyncStatus(s){
   const el = document.getElementById('syncStatus'); if(!el) return;
@@ -443,7 +494,7 @@ function getCarryover(){
 // ═══════════════════════════════════════
 (function init(){
   buildPeriod();
-  loadData();
+  // loadData()는 onAuthStateChanged에서 로그인 후 호출됨
   ['purInput','amtInput'].forEach((id,i)=>{
     document.getElementById(id).addEventListener('keydown',e=>{
       if(e.key==='Enter') i===0?document.getElementById('amtInput').focus():addItem();
@@ -477,7 +528,7 @@ function saveData(){
   const key = periodKey();
   const data = {incomeItems, budgetItems, expenseAmounts, unexpectedExpenses, lastSaved: Date.now()};
   localStorage.setItem(key, JSON.stringify(data));
-  _db.ref('budgetApp/'+key).set(data)
+  fbRef(key).set(data)
     .then(()=>{ setSyncStatus('synced'); toast('저장 · 클라우드 동기화 완료'); })
     .catch(()=>{ setSyncStatus('offline'); toast('저장됨 (오프라인 — 로컬만)'); });
 }
@@ -497,7 +548,7 @@ function loadData(){
   if(_fbUnsub){ _fbUnsub(); _fbUnsub=null; }
   // 3) 새 리스너 등록 (첫 fire = 초기값, 이후 = 다른 기기 변경)
   let firstFire = true;
-  const ref = _db.ref('budgetApp/'+key);
+  const ref = fbRef(key);
   const handler = snap => {
     const d = snap.val();
     if(firstFire){
@@ -666,7 +717,7 @@ function resetData(){
   const key=periodKey();
   const data={incomeItems,budgetItems,expenseAmounts,unexpectedExpenses,lastSaved:Date.now()};
   localStorage.setItem(key,JSON.stringify(data));
-  _db.ref('budgetApp/'+key).set(data).catch(()=>{});
+  fbRef(key).set(data).catch(()=>{});
   renderAll(); toast('초기화되었습니다.');
 }
 
