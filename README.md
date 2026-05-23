@@ -28,6 +28,11 @@ Google 계정으로 로그인해서 수입과 지출을 관리하고, 모든 기
 
 **필요한 것:** Google 계정(Gmail) + GitHub 계정 ([없으면 무료 가입](https://github.com))
 
+> **전체 단계 요약**
+> 1. GitHub에서 Fork → 2. Firebase 프로젝트 생성 → 3. Realtime Database 만들기
+> 4. **Google 로그인 활성화** ⚠️ → 5. 보안 규칙 설정 → 6. Firebase 설정값 복사
+> 7. firebase-config.js 수정 → 8. GitHub Pages 배포 → 9. **앱 도메인 등록** ⚠️
+
 ---
 
 ### STEP 1 — 이 저장소 Fork하기
@@ -59,13 +64,15 @@ Google 계정으로 로그인해서 수입과 지출을 관리하고, 모든 기
 
 ---
 
-### STEP 4 — Google 로그인 활성화
+### STEP 4 — Google 로그인 활성화 ⚠️ 필수 (건너뛰면 로그인 불가)
 
 1. 왼쪽 메뉴 **"빌드" → "Authentication"** 클릭
 2. **"시작하기"** 클릭
-3. **"Google"** 클릭
+3. **"Sign-in method"** 탭 → **"Google"** 클릭
 4. 오른쪽 상단 토글을 **켜기(파란색)** 로 변경
-5. 프로젝트 지원 이메일 선택 → **"저장"**
+5. 프로젝트 지원 이메일 선택 (본인 Gmail) → **"저장"**
+
+> 이 단계를 건너뛰면 `auth/configuration-not-found` 오류가 발생합니다.
 
 ---
 
@@ -146,13 +153,17 @@ window.FIREBASE_CONFIG = {
 
 ---
 
-### STEP 9 — Firebase에 내 앱 주소 등록
+### STEP 9 — Firebase에 내 앱 주소 등록 ⚠️ 필수 (건너뛰면 로그인 불가)
 
-> 이 설정을 해야 로그인이 동작합니다.
+> 이 설정을 해야 Google 로그인이 내 앱에서 동작합니다.
 
-1. Firebase 콘솔 → ⚙️ **"프로젝트 설정" → "Authentication" 탭**
-2. 스크롤 내려서 **"승인된 도메인"** → **"도메인 추가"**
-3. `내아이디.github.io` 입력 → **"추가"**
+1. 왼쪽 메뉴 **"Authentication"** 클릭
+2. 상단 **"Settings"** 탭 클릭
+3. 스크롤 내려서 **"승인된 도메인(Authorized domains)"** 섹션 찾기
+4. **"도메인 추가"** 클릭
+5. `내아이디.github.io` 입력 → **"추가"**
+
+> 이 단계를 건너뛰면 Google 로그인 화면으로 이동했다가 오류와 함께 돌아옵니다.
 
 ---
 
