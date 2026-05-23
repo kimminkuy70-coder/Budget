@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>수입·예산 관리</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
@@ -231,6 +233,8 @@
     /* toast */
     .toast { position:fixed; bottom:24px; right:24px; background:#1e293b; color:white; padding:11px 18px; border-radius:10px; font-size:.85rem; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.18); transform:translateY(60px); opacity:0; transition:transform .25s,opacity .25s; z-index:1000; }
     .toast.show { transform:translateY(0); opacity:1; }
+    /* sync badge */
+    #syncStatus { font-size:.72rem; font-weight:600; padding:4px 12px; border-radius:99px; transition:background .3s,color .3s; white-space:nowrap; }
 
     @media(max-width:860px){
       .app-layout{flex-direction:column;padding:16px;}
@@ -242,9 +246,12 @@
 </head>
 <body>
 
-<header>
-  <h1>수입·예산 관리</h1>
-  <p>수입 계획 · 예산안 · 계층 구조 · 이월 · 실제 지출 비교</p>
+<header style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1>수입·예산 관리</h1>
+    <p>수입 계획 · 예산안 · 계층 구조 · 이월 · 실제 지출 비교</p>
+  </div>
+  <div id="syncStatus" style="background:#fef9c3;color:#92400e">⏳ 연결 중...</div>
 </header>
 
 <div class="app-layout">
@@ -337,6 +344,45 @@
 
 <script>
 // ═══════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════
+firebase.initializeApp({
+  apiKey: "AIzaSyDUdHKiofiwGs-cIDvI7F2Vqk9gkUdMl-g",
+  authDomain: "budget-90486.firebaseapp.com",
+  databaseURL: "https://budget-90486-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "budget-90486",
+  storageBucket: "budget-90486.firebasestorage.app",
+  messagingSenderId: "978513422803",
+  appId: "1:978513422803:web:63102e48b1f18d0303a726"
+});
+const _db = firebase.database();
+let _fbUnsub = null;
+
+function setSyncStatus(s){
+  const el = document.getElementById('syncStatus'); if(!el) return;
+  const map = {
+    synced:  ['☁️ 동기화됨',   '#d1fae5','#065f46'],
+    saving:  ['⏳ 저장 중...',  '#fef9c3','#92400e'],
+    loading: ['🔄 불러오는 중','#eff6ff','#1e40af'],
+    offline: ['📴 오프라인',    '#fee2e2','#991b1b'],
+    updated: ['📱 업데이트됨',  '#ede9fe','#5b21b6'],
+  };
+  const [text,bg,col] = map[s] || map.offline;
+  el.textContent=text; el.style.background=bg; el.style.color=col;
+}
+
+function applyData(d){
+  incomeItems        = d.incomeItems        || [];
+  budgetItems        = d.budgetItems        || [];
+  expenseAmounts     = d.expenseAmounts     || {};
+  unexpectedExpenses = d.unexpectedExpenses || [];
+  _salary            = d.salary             || 0;
+  if(_salary>0 && incomeItems.length===0){
+    incomeItems=[{id:_salary*1000+1,purpose:'월급',amount:_salary,parentId:null,order:0}];
+  }
+}
+
+// ═══════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════
 let mode = 'income';
@@ -424,29 +470,56 @@ function periodKey(){
 //  SAVE / LOAD
 // ═══════════════════════════════════════
 function saveData(){
-  localStorage.setItem(periodKey(),JSON.stringify({incomeItems,budgetItems,expenseAmounts,unexpectedExpenses}));
-  toast('저장되었습니다.');
+  setSyncStatus('saving');
+  const key = periodKey();
+  const data = {incomeItems, budgetItems, expenseAmounts, unexpectedExpenses, lastSaved: Date.now()};
+  localStorage.setItem(key, JSON.stringify(data));
+  _db.ref('budgetApp/'+key).set(data)
+    .then(()=>{ setSyncStatus('synced'); toast('저장 · 클라우드 동기화 완료'); })
+    .catch(()=>{ setSyncStatus('offline'); toast('저장됨 (오프라인 — 로컬만)'); });
 }
 
 function loadData(){
-  const raw=localStorage.getItem(periodKey());
+  const key = periodKey();
+  setSyncStatus('loading');
+  // 1) 로컬스토리지에서 즉시 로드
+  const raw = localStorage.getItem(key);
+  let localTs = 0;
   if(raw){
-    try{
-      const d=JSON.parse(raw);
-      incomeItems        = d.incomeItems        || [];
-      budgetItems        = d.budgetItems        || [];
-      expenseAmounts     = d.expenseAmounts     || {};
-      unexpectedExpenses = d.unexpectedExpenses || [];
-      _salary            = d.salary             || 0;
-      // 구버전 데이터 마이그레이션: salary → incomeItems
-      if(_salary>0 && incomeItems.length===0){
-        incomeItems=[{id:_salary*1000+1,purpose:'월급',amount:_salary,parentId:null,order:0}];
-      }
-    }catch{ incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[]; }
-  } else {
-    incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
-  }
+    try{ const d=JSON.parse(raw); applyData(d); localTs=d.lastSaved||0; }
+    catch{ applyData({}); }
+  } else { applyData({}); }
   renderAll();
+  // 2) 기존 Firebase 리스너 해제
+  if(_fbUnsub){ _fbUnsub(); _fbUnsub=null; }
+  // 3) 새 리스너 등록 (첫 fire = 초기값, 이후 = 다른 기기 변경)
+  let firstFire = true;
+  const ref = _db.ref('budgetApp/'+key);
+  const handler = snap => {
+    const d = snap.val();
+    if(firstFire){
+      firstFire = false;
+      if(d && (d.lastSaved||0) > localTs){
+        applyData(d);
+        localStorage.setItem(key, JSON.stringify(d));
+        renderAll();
+        toast('☁️ 클라우드에서 최신 데이터를 불러왔습니다.');
+      }
+      setSyncStatus('synced');
+      return;
+    }
+    // 다른 기기에서 저장된 경우 (편집 중이 아닐 때만 반영)
+    if(!d) return;
+    if(editId||unexpEditId||budgetExpEditId) return;
+    applyData(d);
+    localStorage.setItem(key, JSON.stringify(d));
+    renderAll();
+    setSyncStatus('updated');
+    toast('📱 다른 기기에서 변경사항이 적용되었습니다.');
+    setTimeout(()=>setSyncStatus('synced'), 3000);
+  };
+  ref.on('value', handler, ()=>setSyncStatus('offline'));
+  _fbUnsub = ()=>ref.off('value', handler);
 }
 
 // ═══════════════════════════════════════
