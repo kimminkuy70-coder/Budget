@@ -511,7 +511,7 @@ function updateExpense(id,val){
       const par=budgetItems.find(i=>i.id===pid); if(!par) break;
       expenseAmounts[pid]=budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
       const inp=document.getElementById(`exp-inp-${pid}`);
-      if(inp) inp.value=expenseAmounts[pid]||'';
+      if(inp){ if(inp.tagName==='INPUT') inp.value=expenseAmounts[pid]||''; else inp.textContent=fw(expenseAmounts[pid]||0); }
       updateExpRemain(pid);
       pid=par.parentId;
     }
@@ -643,7 +643,7 @@ function renderModeUI(){
   }
 
   document.getElementById('sumTitle').textContent  = ii?'수입 현황':ib?'예산 현황':'지출 현황';
-  document.getElementById('addTitle').textContent  = ii?'수입 항목 추가':ib?'예산 항목 추가':'예상치 못한 지출 추가';
+  document.getElementById('addTitle').textContent  = ii?'수입 항목 추가':ib?'예산 항목 추가':'세부 내역';
   document.getElementById('purLbl').textContent    = ii?'수입 목적':ib?'예산 목적':'지출 목적';
   document.getElementById('amtLbl').textContent    = ii?'수입 금액 (원)':ib?'예산 금액 (원)':'지출 금액 (원)';
   document.getElementById('purInput').placeholder  = ii?'예) 월급, 부업, 이자...':ib?'예) 식비, 교통비...':'예) 병원비, 긴급수리...';
@@ -790,8 +790,7 @@ function initParentExpenses(){
   budgetItems.filter(item=>budgetItems.some(i=>i.parentId===item.id))
     .sort((a,b)=>depth(b.id)-depth(a.id))
     .forEach(item=>{
-      if(expenseAmounts[item.id]===undefined)
-        expenseAmounts[item.id]=budgetItems.filter(i=>i.parentId===item.id).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
+      expenseAmounts[item.id]=budgetItems.filter(i=>i.parentId===item.id).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
     });
 }
 
@@ -849,6 +848,9 @@ function renderExpRow({type,item,depth},idx){
   if(type==='budget'){
     const hasKids=budgetItems.some(i=>i.parentId===item.id);
     const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
+    const expCell=hasKids
+      ? `<div class="exp-input" id="exp-inp-${item.id}" style="display:flex;align-items:center;justify-content:flex-end;font-size:.85rem;font-weight:700;color:#ef4444;background:#f1f5f9;border-color:#e2e8f0;cursor:default;">${fw(actual)}</div>`
+      : `<input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000" oninput="updateExpense(${item.id},this.value)"/>`;
     return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${hasKids?'background:#f8fafc;':''}"
       draggable="true"
       ondragstart="onDragStart(event,${item.id},'budget')" ondragend="onDragEnd(event)"
@@ -857,8 +859,7 @@ function renderExpRow({type,item,depth},idx){
       <div class="item-num">${idx}</div>
       <div class="exp-name" style="${hasKids?'font-weight:700;':''}">${esc(item.purpose)}</div>
       <div class="exp-bamt">${fw(item.amount)}</div>
-      <input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000"
-        oninput="updateExpense(${item.id},this.value)"/>
+      ${expCell}
       <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
     </div>`;
   } else {
