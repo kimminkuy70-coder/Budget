@@ -351,7 +351,8 @@ let editId   = null;
 let editType = null; // 'income' | 'budget' | 'unexp'
 let dndId    = null;
 let dndType  = null; // 'income' | 'budget' | 'unexp'
-let unexpEditId = null; // 지출 모드에서 편집 중인 세부 내역 항목 id
+let unexpEditId    = null;
+let budgetExpEditId = null; // 지출 모드에서 편집 중인 예산 leaf 항목 id
 
 // ═══════════════════════════════════════
 //  COMPUTED
@@ -451,7 +452,7 @@ function loadData(){
 // ═══════════════════════════════════════
 //  MODE
 // ═══════════════════════════════════════
-function switchMode(m){ mode=m; editId=null; renderAll(); }
+function switchMode(m){ mode=m; editId=null; budgetExpEditId=null; unexpEditId=null; renderAll(); }
 
 // ═══════════════════════════════════════
 //  ADD ITEM
@@ -928,9 +929,25 @@ function renderExpRow({type,item,depth,sibIdx}){
   if(type==='budget'){
     const hasKids=budgetItems.some(i=>i.parentId===item.id)||unexpectedExpenses.some(u=>u.parentId===item.id);
     const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
-    const expCell=hasKids
-      ? `<div id="exp-inp-${item.id}" style="font-size:.85rem;font-weight:700;color:#ef4444;text-align:right;">${fw(actual)}</div>`
-      : `<input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000" oninput="updateExpense(${item.id},this.value)"/>`;
+    const isLeafEditing=(!hasKids)&&(item.id===budgetExpEditId);
+    // 실제 지출 셀: 상위(hasKids) 또는 leaf 비편집 → 텍스트, leaf 편집 → input
+    const expCell = (hasKids||!isLeafEditing)
+      ? `<div id="exp-inp-${item.id}" style="font-size:.85rem;font-weight:700;color:${actual>0?'#ef4444':'#94a3b8'};text-align:right;">${fw(actual)}</div>`
+      : `<input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000"
+          oninput="updateExpense(${item.id},this.value)"
+          onkeydown="if(event.key==='Enter'||event.key==='Escape')endBudgetExp()"/>`;
+    // 잔액 셀: leaf 편집 중이면 체크 버튼 + 잔액, 아니면 잔액 + (leaf이면 연필 버튼)
+    const remainCell = hasKids
+      ? `<div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>`
+      : isLeafEditing
+        ? `<div style="display:flex;align-items:center;gap:3px;justify-content:flex-end">
+             <button class="btn-ico edit" onclick="endBudgetExp()" title="확인">${checkIcon()}</button>
+             <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
+           </div>`
+        : `<div style="display:flex;align-items:center;gap:3px;justify-content:flex-end">
+             <button class="btn-ico edit" onclick="startBudgetExp(${item.id})" title="수정">${editIcon()}</button>
+             <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
+           </div>`;
     return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${hasKids?'background:#f8fafc;':''}"
       draggable="true"
       ondragstart="onDragStart(event,${item.id},'budget')" ondragend="onDragEnd(event)"
@@ -940,7 +957,7 @@ function renderExpRow({type,item,depth,sibIdx}){
       <div class="exp-name" style="${hasKids?'font-weight:700;':''}">${esc(item.purpose)}</div>
       <div class="exp-bamt">${fw(item.amount)}</div>
       ${expCell}
-      <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
+      ${remainCell}
     </div>`;
   } else {
     const isEditing = item.id === unexpEditId;
@@ -966,6 +983,9 @@ function renderExpRow({type,item,depth,sibIdx}){
     </div>`;
   }
 }
+
+function startBudgetExp(id){ budgetExpEditId=id; renderList(); requestAnimationFrame(()=>document.getElementById(`exp-inp-${id}`)?.focus()); }
+function endBudgetExp(){ budgetExpEditId=null; renderList(); }
 
 function startUnexpEdit(id){
   unexpEditId=id; renderList();
