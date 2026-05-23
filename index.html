@@ -379,13 +379,19 @@ function fbRef(key){ return _db.ref(`budgetApp/${_currentUser.uid}/${key}`); }
 
 function signInWithGoogle(){
   const provider = new firebase.auth.GoogleAuthProvider();
-  _auth.signInWithPopup(provider).catch(err=>toast('로그인 실패: '+err.message));
+  // PWA/standalone 환경에서 팝업이 막히는 경우가 있어 리다이렉트 방식 사용
+  _auth.signInWithRedirect(provider).catch(err=>toast('로그인 실패: '+err.message));
 }
 function signOutUser(){
   if(!confirm('로그아웃 하시겠습니까?'))return;
   if(_fbUnsub){_fbUnsub();_fbUnsub=null;}
   _auth.signOut();
 }
+
+// 리다이렉트 로그인 결과 처리 (페이지 복귀 후 자동 실행)
+_auth.getRedirectResult().catch(err=>{
+  if(err.code && err.code !== 'auth/no-current-user') toast('로그인 오류: '+err.message);
+});
 
 _auth.onAuthStateChanged(user=>{
   _currentUser=user;
