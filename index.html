@@ -472,8 +472,19 @@ function deleteItem(id, type){
     unexpectedExpenses.forEach(u=>{ if(toRemove.has(u.parentId)) u.parentId=null; });
   } else {
     function collectUDesc(pid){ return unexpectedExpenses.filter(i=>i.parentId===pid).flatMap(i=>[i.id,...collectUDesc(i.id)]); }
+    const item=unexpectedExpenses.find(i=>i.id===id);
+    const parentBudgetId=item?.parentId||null;
     const toRemove=new Set([id,...collectUDesc(id)]);
     unexpectedExpenses=unexpectedExpenses.filter(i=>!toRemove.has(i.id));
+    // 상위 예산 항목 실제 지출 재계산
+    if(parentBudgetId!==null){
+      let pid=parentBudgetId;
+      while(pid!==null&&pid!==undefined){
+        const par=budgetItems.find(i=>i.id===pid); if(!par) break;
+        expenseAmounts[pid]=computeParentExpense(pid);
+        pid=par.parentId;
+      }
+    }
   }
   if(editId===id) editId=null;
   renderAll();
@@ -862,7 +873,7 @@ function renderExpRow({type,item,depth},idx){
     const hasKids=budgetItems.some(i=>i.parentId===item.id)||unexpectedExpenses.some(u=>u.parentId===item.id);
     const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
     const expCell=hasKids
-      ? `<div class="exp-input" id="exp-inp-${item.id}" style="display:flex;align-items:center;justify-content:flex-end;font-size:.85rem;font-weight:700;color:#ef4444;background:#f1f5f9;border-color:#e2e8f0;cursor:default;">${fw(actual)}</div>`
+      ? `<div id="exp-inp-${item.id}" style="font-size:.85rem;font-weight:700;color:#ef4444;text-align:right;">${fw(actual)}</div>`
       : `<input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000" oninput="updateExpense(${item.id},this.value)"/>`;
     return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${hasKids?'background:#f8fafc;':''}"
       draggable="true"
