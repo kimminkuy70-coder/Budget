@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>예산안 관리</title>
+  <title>수입·예산 관리</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
 
-    header { background:linear-gradient(135deg,#1e40af,#3b82f6); color:white; padding:18px 28px; box-shadow:0 4px 12px rgba(30,64,175,.25); }
+    header { background:linear-gradient(135deg,#065f46,#059669); color:white; padding:18px 28px; box-shadow:0 4px 12px rgba(6,95,70,.25); }
     header h1 { font-size:1.25rem; font-weight:700; }
     header p  { font-size:.8rem; opacity:.75; margin-top:2px; }
 
@@ -20,24 +20,24 @@
     .card { background:white; border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
     .card-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#94a3b8; margin-bottom:10px; }
 
-    /* mode tabs */
-    .mode-tabs { display:flex; background:white; border-radius:14px; padding:6px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
-    .mode-tab { flex:1; padding:10px; border:none; border-radius:10px; background:transparent; cursor:pointer; font-size:.88rem; font-weight:600; color:#94a3b8; transition:all .2s; }
+    /* ── mode tabs (3개) ── */
+    .mode-tabs { display:flex; background:white; border-radius:14px; padding:6px; box-shadow:0 2px 8px rgba(0,0,0,.06); gap:4px; }
+    .mode-tab { flex:1; padding:9px 4px; border:none; border-radius:10px; background:transparent; cursor:pointer; font-size:.8rem; font-weight:600; color:#94a3b8; transition:all .2s; }
+    .mode-tab.ia { background:#059669; color:white; box-shadow:0 2px 8px rgba(5,150,105,.3); }
     .mode-tab.ba { background:#1e40af; color:white; box-shadow:0 2px 8px rgba(30,64,175,.3); }
     .mode-tab.ea { background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,.3); }
 
     /* period */
-    .period-row { display:flex; gap:8px; margin-bottom:12px; }
+    .period-row { display:flex; gap:8px; margin-bottom:0; }
     .period-row select { flex:1; border:2px solid #e2e8f0; border-radius:8px; padding:7px 10px; font-size:.85rem; color:#1e293b; outline:none; background:#f8fafc; cursor:pointer; }
-    .period-row select:focus { border-color:#3b82f6; }
+    .period-row select:focus { border-color:#059669; }
 
-    /* input */
-    .input-wrap { display:flex; align-items:center; border:2px solid #e2e8f0; border-radius:10px; overflow:hidden; transition:border-color .2s; }
-    .input-wrap:focus-within { border-color:#3b82f6; }
-    .input-wrap .pfx { padding:0 12px; background:#f8fafc; color:#64748b; height:44px; display:flex; align-items:center; border-right:1px solid #e2e8f0; font-size:.9rem; }
-    .input-wrap input { border:none; outline:none; padding:0 12px; font-size:1rem; font-weight:600; color:#1e293b; height:44px; width:100%; background:transparent; }
-    .btn-set { margin-top:8px; width:100%; height:40px; background:#1e40af; color:white; border:none; border-radius:10px; cursor:pointer; font-size:.88rem; font-weight:600; transition:background .2s; }
-    .btn-set:hover { background:#1d3a9e; }
+    /* income total display (budget/expense mode) */
+    .income-total-row { display:flex; justify-content:space-between; align-items:center; margin-top:12px; background:#f0fdf4; border-radius:10px; padding:10px 14px; }
+    .income-total-lbl { font-size:.75rem; color:#065f46; font-weight:600; }
+    .income-total-val { font-size:.95rem; font-weight:700; color:#059669; }
+    .btn-go-income { display:block; margin-top:6px; width:100%; padding:6px; background:none; border:1.5px dashed #a7f3d0; border-radius:8px; color:#059669; font-size:.75rem; font-weight:600; cursor:pointer; text-align:center; transition:all .2s; }
+    .btn-go-income:hover { background:#f0fdf4; }
 
     /* carryover badge */
     .carryover-box { background:#eff6ff; border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
@@ -50,13 +50,14 @@
     .sum-item { background:#f8fafc; border-radius:10px; padding:10px; text-align:center; }
     .sum-item .sl { font-size:.7rem; color:#64748b; font-weight:600; margin-bottom:3px; }
     .sum-item .sv { font-size:.95rem; font-weight:700; }
-    .c-blue { color:#1e40af; } .c-red { color:#ef4444; } .c-green { color:#10b981; } .c-purple { color:#7c3aed; }
+    .c-blue { color:#1e40af; } .c-red { color:#ef4444; } .c-green { color:#059669; } .c-purple { color:#7c3aed; }
 
     .prog-wrap { margin-top:12px; }
     .prog-bg { height:8px; background:#e2e8f0; border-radius:99px; overflow:hidden; }
     .prog-fill { height:100%; border-radius:99px; transition:width .4s; }
-    .prog-fill.b { background:linear-gradient(90deg,#3b82f6,#6366f1); }
-    .prog-fill.e { background:linear-gradient(90deg,#7c3aed,#a855f7); }
+    .prog-fill.ia { background:linear-gradient(90deg,#059669,#34d399); }
+    .prog-fill.b  { background:linear-gradient(90deg,#3b82f6,#6366f1); }
+    .prog-fill.e  { background:linear-gradient(90deg,#7c3aed,#a855f7); }
     .prog-fill.ov { background:linear-gradient(90deg,#ef4444,#f97316); }
     .prog-lbl { display:flex; justify-content:space-between; font-size:.7rem; color:#94a3b8; margin-top:3px; }
 
@@ -65,10 +66,13 @@
     .fg { display:flex; flex-direction:column; gap:4px; }
     .fg label { font-size:.73rem; font-weight:600; color:#475569; }
     .fg input { border:2px solid #e2e8f0; border-radius:10px; padding:0 12px; height:40px; font-size:.9rem; outline:none; color:#1e293b; transition:border-color .2s; }
-    .fg input:focus { border-color:#3b82f6; }
+    .fg input:focus { border-color:#059669; }
+    .fg input.bf:focus { border-color:#3b82f6; }
     .fg input.ep:focus { border-color:#7c3aed; }
-    .btn-add { height:40px; background:#10b981; color:white; border:none; border-radius:10px; cursor:pointer; font-size:.88rem; font-weight:600; transition:background .2s; }
-    .btn-add:hover { background:#059669; }
+    .btn-add { height:40px; background:#059669; color:white; border:none; border-radius:10px; cursor:pointer; font-size:.88rem; font-weight:600; transition:background .2s; }
+    .btn-add:hover { background:#047857; }
+    .btn-add.bf { background:#1e40af; }
+    .btn-add.bf:hover { background:#1d3a9e; }
     .btn-add.ep { background:#7c3aed; }
     .btn-add.ep:hover { background:#6d28d9; }
 
@@ -89,19 +93,23 @@
     .list-title { font-size:1rem; font-weight:700; }
     .list-cnt { font-size:.75rem; background:#f1f5f9; color:#64748b; padding:3px 10px; border-radius:99px; font-weight:600; }
 
-    /* ── tree items (budget mode) ── */
+    /* ── tree items ── */
     .tree-item {
       display:flex; align-items:center; gap:8px;
       padding:11px 14px; background:#f8fafc; border-radius:10px;
       margin-bottom:6px; position:relative; cursor:default;
-      transition:background .15s;
-      border:2px solid transparent;
+      transition:background .15s; border:2px solid transparent;
     }
     .tree-item:hover { background:#f1f5f9; }
     .tree-item.dragging { opacity:.35; }
-    .tree-item.drop-before { border-top:3px solid #3b82f6; border-radius:10px; }
-    .tree-item.drop-after  { border-bottom:3px solid #3b82f6; border-radius:10px; }
-    .tree-item.drop-on     { border:2px solid #3b82f6; background:#eff6ff; }
+    .tree-item.drop-before { border-top:3px solid #059669; }
+    .tree-item.drop-after  { border-bottom:3px solid #059669; }
+    .tree-item.drop-on     { border:2px solid #059669; background:#f0fdf4; }
+    /* budget DnD colours */
+    .tree-item.drop-before.bf { border-top-color:#3b82f6; }
+    .tree-item.drop-after.bf  { border-bottom-color:#3b82f6; }
+    .tree-item.drop-on.bf     { border-color:#3b82f6; background:#eff6ff; }
+    /* unexp DnD colours */
     .tree-item.drop-before.ep { border-top-color:#7c3aed; }
     .tree-item.drop-after.ep  { border-bottom-color:#7c3aed; }
     .tree-item.drop-on.ep     { border-color:#7c3aed; background:#f5f3ff; }
@@ -110,33 +118,52 @@
     .drag-handle:hover { color:#94a3b8; background:#e2e8f0; }
     .drag-handle:active { cursor:grabbing; }
 
-    .item-num { width:22px; height:22px; background:#dbeafe; color:#1e40af; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; flex-shrink:0; }
+    .item-num { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; flex-shrink:0; background:#dbeafe; color:#1e40af; }
+    .item-num.ia { background:#d1fae5; color:#065f46; }
     .item-num.ep { background:#ede9fe; color:#7c3aed; }
     .item-num.unexp { background:#fce7f3; color:#db2777; }
 
     .item-purpose { flex:1; font-weight:500; font-size:.9rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .item-pct { font-size:.7rem; color:#94a3b8; width:36px; text-align:right; flex-shrink:0; }
-    .item-amt { font-weight:700; font-size:.88rem; color:#ef4444; white-space:nowrap; flex-shrink:0; }
-    .item-amt.ep { color:#7c3aed; }
+    .item-amt { font-weight:700; font-size:.88rem; white-space:nowrap; flex-shrink:0; color:#ef4444; }
+    .item-amt.ia { color:#059669; }
 
     .btn-ico { background:none; border:none; cursor:pointer; width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:all .15s; color:#cbd5e1; flex-shrink:0; }
-    .btn-ico.edit:hover   { background:#dbeafe; color:#1e40af; }
-    .btn-ico.del:hover    { background:#fee2e2; color:#ef4444; }
+    .btn-ico.edit:hover { background:#dbeafe; color:#1e40af; }
+    .btn-ico.del:hover  { background:#fee2e2; color:#ef4444; }
 
     /* inline edit */
-    .tree-item.editing { background:#eff6ff; border:2px solid #bfdbfe; padding:9px 12px; }
+    .tree-item.editing    { background:#f0fdf4; border:2px solid #a7f3d0; padding:9px 12px; }
+    .tree-item.editing.bf { background:#eff6ff; border-color:#bfdbfe; }
     .edit-form { display:flex; align-items:center; gap:7px; width:100%; flex-wrap:wrap; }
-    .ei { border:2px solid #bfdbfe; border-radius:8px; padding:0 10px; height:32px; font-size:.86rem; outline:none; color:#1e293b; background:white; }
-    .ei:focus { border-color:#3b82f6; }
+    .ei { border:2px solid #a7f3d0; border-radius:8px; padding:0 10px; height:32px; font-size:.86rem; outline:none; color:#1e293b; background:white; }
+    .ei:focus { border-color:#059669; }
+    .ei.bf { border-color:#bfdbfe; }
+    .ei.bf:focus { border-color:#3b82f6; }
     .ei.ep { border-color:#ddd6fe; }
     .ei.ep:focus { border-color:#7c3aed; }
     .ei-p { flex:2; min-width:90px; }
     .ei-a { flex:1; min-width:70px; }
-    .btn-ok { height:32px; padding:0 10px; background:#1e40af; color:white; border:none; border-radius:7px; cursor:pointer; font-size:.8rem; font-weight:600; }
-    .btn-ok:hover { background:#1d3a9e; }
+    .btn-ok { height:32px; padding:0 10px; background:#059669; color:white; border:none; border-radius:7px; cursor:pointer; font-size:.8rem; font-weight:600; }
+    .btn-ok:hover { background:#047857; }
+    .btn-ok.bf { background:#1e40af; }
+    .btn-ok.bf:hover { background:#1d3a9e; }
     .btn-ok.ep { background:#7c3aed; }
     .btn-ok.ep:hover { background:#6d28d9; }
     .btn-cx { height:32px; padding:0 10px; background:#f1f5f9; color:#64748b; border:none; border-radius:7px; cursor:pointer; font-size:.8rem; font-weight:600; }
+
+    /* bracket group */
+    .bracket-group { position:relative; }
+    .tree-item.has-kids    { background:#eff6ff; }
+    .tree-item.has-kids:hover { background:#dbeafe; }
+    .tree-item.has-kids-ia { background:#f0fdf4; }
+    .tree-item.has-kids-ia:hover { background:#dcfce7; }
+    .bracket-sum-row { display:flex; justify-content:flex-end; align-items:center; gap:6px; padding:3px 12px 6px; font-size:.73rem; border-top:1.5px dashed #93c5fd; margin:0 4px 6px; }
+    .bracket-sum-row.ia-bsr { border-top-color:#6ee7b7; }
+    .bsr-label { color:#93c5fd; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+    .bsr-label.ia { color:#6ee7b7; }
+    .bsr-val { font-weight:700; color:#1e40af; font-size:.8rem; }
+    .bsr-val.ia { color:#059669; }
 
     /* ── expense mode table ── */
     .exp-table { width:100%; }
@@ -155,7 +182,6 @@
     .exp-bamt { font-size:.85rem; color:#1e40af; font-weight:600; text-align:right; }
     .exp-input { width:100%; border:2px solid #e2e8f0; border-radius:7px; padding:0 8px; height:32px; font-size:.85rem; font-weight:600; outline:none; color:#1e293b; transition:border-color .2s; text-align:right; }
     .exp-input:focus { border-color:#7c3aed; }
-    .exp-input[readonly] { background:#f8fafc; color:#94a3b8; cursor:default; border-color:transparent; font-size:.82rem; }
     .exp-remain { font-size:.85rem; font-weight:700; color:#10b981; text-align:right; }
     .exp-remain.neg { color:#ef4444; }
     .unexp-badge { font-size:.65rem; background:#fae8ff; color:#9333ea; padding:1px 5px; border-radius:4px; font-weight:700; white-space:nowrap; }
@@ -166,13 +192,13 @@
     .exp-tbamt { font-size:.85rem; color:#1e40af; text-align:right; }
     .exp-tact  { font-size:.85rem; color:#ef4444; text-align:right; }
     .exp-trem  { font-size:.85rem; font-weight:700; text-align:right; }
+    .exp-trem.neg { color:#ef4444; }
 
     .exp-final { display:flex; justify-content:space-between; align-items:center; background:#f5f3ff; border-radius:10px; padding:14px 16px; margin-top:8px; }
     .exp-final-lbl { font-size:.85rem; font-weight:700; color:#6d28d9; }
     .exp-final-amt { font-size:1.15rem; font-weight:700; color:#7c3aed; }
     .exp-final-amt.neg { color:#ef4444; }
 
-    /* carryover in expense final */
     .exp-co-row { display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border-radius:10px; padding:10px 16px; margin-top:8px; }
     .exp-co-lbl { font-size:.78rem; font-weight:600; color:#1e40af; }
     .exp-co-amt { font-size:.9rem; font-weight:700; color:#1e40af; }
@@ -185,18 +211,6 @@
     .toast { position:fixed; bottom:24px; right:24px; background:#1e293b; color:white; padding:11px 18px; border-radius:10px; font-size:.85rem; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.18); transform:translateY(60px); opacity:0; transition:transform .25s,opacity .25s; z-index:1000; }
     .toast.show { transform:translateY(0); opacity:1; }
 
-    /* bracket visualization (budget mode children group) */
-    .bracket-group { position:relative; }
-    .tree-item.has-kids { background:#eff6ff; }
-    .tree-item.has-kids:hover { background:#dbeafe; }
-    .bracket-sum-row {
-      display:flex; justify-content:flex-end; align-items:center; gap:6px;
-      padding:3px 12px 6px; font-size:.73rem;
-      border-top:1.5px dashed #93c5fd; margin:0 4px 6px;
-    }
-    .bsr-label { color:#93c5fd; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
-    .bsr-val { font-weight:700; color:#1e40af; font-size:.8rem; }
-
     @media(max-width:860px){
       .app-layout{flex-direction:column;padding:16px;}
       .left-panel{width:100%;}
@@ -208,8 +222,8 @@
 <body>
 
 <header>
-  <h1>예산안 관리</h1>
-  <p>월급 기반 예산 계획 · 이월 · 계층 구조 · 실제 지출 비교</p>
+  <h1>수입·예산 관리</h1>
+  <p>수입 계획 · 예산안 · 계층 구조 · 이월 · 실제 지출 비교</p>
 </header>
 
 <div class="app-layout">
@@ -218,11 +232,12 @@
   <div class="left-panel">
 
     <div class="mode-tabs">
-      <button class="mode-tab ba" id="tab-b" onclick="switchMode('budget')">예산안 모드</button>
-      <button class="mode-tab"    id="tab-e" onclick="switchMode('expense')">지출 내역 모드</button>
+      <button class="mode-tab ia" id="tab-i" onclick="switchMode('income')">수입 관리</button>
+      <button class="mode-tab"   id="tab-b" onclick="switchMode('budget')">예산안</button>
+      <button class="mode-tab"   id="tab-e" onclick="switchMode('expense')">지출 내역</button>
     </div>
 
-    <!-- 기간 + 월급/안내 -->
+    <!-- 기간 + 수입 요약 / 이월 -->
     <div class="card">
       <div class="card-label">기간 설정</div>
       <div class="period-row">
@@ -230,40 +245,40 @@
         <select id="monthSel"></select>
       </div>
 
-      <div id="salSec">
-        <div class="card-label">월급</div>
-        <div class="input-wrap">
-          <span class="pfx">₩</span>
-          <input type="number" id="salInput" placeholder="월급 입력" min="0" step="10000"/>
+      <!-- 수입 요약 (예산안·지출 모드에서만 표시) -->
+      <div id="incomeSec" style="display:none">
+        <div class="income-total-row">
+          <span class="income-total-lbl">총 수입</span>
+          <span class="income-total-val" id="incomeTotalVal">₩0</span>
         </div>
-        <button class="btn-set" onclick="setSalary()">설정</button>
+        <button class="btn-go-income" onclick="switchMode('income')">수입 항목 관리 →</button>
       </div>
 
+      <!-- 이월 (이월이 있을 때만, 수입모드 제외) -->
       <div id="coSec" style="display:none">
-        <div class="card-label">전월 이월</div>
         <div class="carryover-box" id="coBox">
-          <span class="cl">이월 금액</span>
+          <span class="cl">전월 이월</span>
           <span class="cv" id="coVal">₩0</span>
         </div>
       </div>
     </div>
 
-    <!-- 잔액 현황 -->
+    <!-- 현황 -->
     <div class="card">
-      <div class="card-label" id="sumTitle">예산 현황</div>
+      <div class="card-label" id="sumTitle">수입 현황</div>
       <div class="sum-grid" id="sumGrid"></div>
       <div class="prog-wrap">
-        <div class="prog-bg"><div class="prog-fill b" id="progFill" style="width:0%"></div></div>
-        <div class="prog-lbl"><span>0%</span><span id="progPct">0%</span><span>100%</span></div>
+        <div class="prog-bg"><div class="prog-fill ia" id="progFill" style="width:0%"></div></div>
+        <div class="prog-lbl"><span>0%</span><span id="progPct"></span><span>100%</span></div>
       </div>
     </div>
 
     <!-- 추가 폼 -->
     <div class="card" id="addCard">
-      <div class="card-label" id="addTitle">예산 항목 추가</div>
+      <div class="card-label" id="addTitle">수입 항목 추가</div>
       <div class="form-col">
-        <div class="fg"><label id="purLbl">예산 목적</label><input type="text"   id="purInput" placeholder="예) 식비, 교통비..."/></div>
-        <div class="fg"><label id="amtLbl">금액 (원)</label> <input type="number" id="amtInput" placeholder="0" min="0" step="1000"/></div>
+        <div class="fg"><label id="purLbl">수입 목적</label><input type="text" id="purInput" placeholder="예) 월급, 부업, 이자..."/></div>
+        <div class="fg"><label id="amtLbl">금액 (원)</label><input type="number" id="amtInput" placeholder="0" min="0" step="10000"/></div>
         <button class="btn-add" id="btnAdd" onclick="addItem()">+ 추가</button>
       </div>
     </div>
@@ -289,7 +304,7 @@
   <div class="right-panel">
     <div class="card">
       <div class="list-hd">
-        <span class="list-title" id="listTitle">예산 항목</span>
+        <span class="list-title" id="listTitle">수입 항목</span>
         <span class="list-cnt"   id="listCnt">0개</span>
       </div>
       <div id="itemList"></div>
@@ -303,43 +318,45 @@
 // ═══════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════
-let mode   = 'budget';
-let salary = 0;
-// { id, purpose, amount, parentId:null|id, order:int }
+let mode = 'income';
+// { id, purpose, amount, parentId:null|id, order }
+let incomeItems        = [];
 let budgetItems        = [];
-let expenseAmounts     = {};   // { budgetItemId: actualSpent }
-// { id, purpose, amount, parentId:null|budgetItemId, order:int }
+let expenseAmounts     = {};  // { budgetItemId: actualSpent }
 let unexpectedExpenses = [];
+let _salary = 0; // migration용 (구버전 데이터 변환 후 폐기)
 
 let editId   = null;
-let editType = null; // 'budget' | 'unexp'
+let editType = null; // 'income' | 'budget' | 'unexp'
 let dndId    = null;
-let dndIsBudget = true;
+let dndType  = null; // 'income' | 'budget' | 'unexp'
 
 // ═══════════════════════════════════════
 //  COMPUTED
 // ═══════════════════════════════════════
-// 예산 합계: 최상위 항목들의 자체 금액 합산 (이중계산 없음)
+const totalIncome = () => incomeItems.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
 const budgetTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
-// 실제 지출 합계: 최상위 항목들의 실제 지출 합산
 const actualTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+(expenseAmounts[i.id]||0),0);
 const unexpTotal  = () => unexpectedExpenses.reduce((s,i)=>s+i.amount,0);
-// 직계 하위 항목 금액 합산 (bracket 표시용)
-function childrenAmtSum(pid){ return budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+c.amount,0); }
 
-function getCarryover() {
-  const y = +document.getElementById('yearSel').value;
-  const m = +document.getElementById('monthSel').value;
-  const pm = m===1?12:m-1, py = m===1?y-1:y;
-  const raw = localStorage.getItem(`budget_${py}_${pm}`);
-  if (!raw) return 0;
-  try {
-    const d = JSON.parse(raw);
-    const bi = d.budgetItems||[], ea = d.expenseAmounts||{}, ue = d.unexpectedExpenses||[];
-    const act   = bi.filter(i=>i.parentId===null).reduce((s,i)=>s+(ea[i.id]||0),0);
-    const unexp = ue.reduce((s,i)=>s+i.amount,0);
-    return (d.salary||0) - act - unexp;
-  } catch { return 0; }
+function childrenAmtSum(arr, pid){
+  return arr.filter(i=>i.parentId===pid).reduce((s,c)=>s+c.amount,0);
+}
+
+function getCarryover(){
+  const y=+document.getElementById('yearSel').value;
+  const m=+document.getElementById('monthSel').value;
+  const pm=m===1?12:m-1, py=m===1?y-1:y;
+  const raw=localStorage.getItem(`budget_${py}_${pm}`);
+  if(!raw) return 0;
+  try{
+    const d=JSON.parse(raw);
+    const bi=d.budgetItems||[], ea=d.expenseAmounts||{}, ue=d.unexpectedExpenses||[];
+    const prevIncome=(d.incomeItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
+    const act=bi.filter(i=>i.parentId===null).reduce((s,i)=>s+(ea[i.id]||0),0);
+    const unexp=ue.reduce((s,i)=>s+i.amount,0);
+    return prevIncome-act-unexp;
+  }catch{ return 0; }
 }
 
 // ═══════════════════════════════════════
@@ -350,11 +367,8 @@ function getCarryover() {
   loadData();
   ['purInput','amtInput'].forEach((id,i)=>{
     document.getElementById(id).addEventListener('keydown',e=>{
-      if(e.key==='Enter') i===0 ? document.getElementById('amtInput').focus() : addItem();
+      if(e.key==='Enter') i===0?document.getElementById('amtInput').focus():addItem();
     });
-  });
-  document.getElementById('salInput').addEventListener('keydown',e=>{
-    if(e.key==='Enter') setSalary();
   });
 })();
 
@@ -380,7 +394,7 @@ function periodKey(){
 //  SAVE / LOAD
 // ═══════════════════════════════════════
 function saveData(){
-  localStorage.setItem(periodKey(), JSON.stringify({salary,budgetItems,expenseAmounts,unexpectedExpenses}));
+  localStorage.setItem(periodKey(),JSON.stringify({incomeItems,budgetItems,expenseAmounts,unexpectedExpenses}));
   toast('저장되었습니다.');
 }
 
@@ -389,15 +403,19 @@ function loadData(){
   if(raw){
     try{
       const d=JSON.parse(raw);
-      salary             = d.salary             || 0;
+      incomeItems        = d.incomeItems        || [];
       budgetItems        = d.budgetItems        || [];
       expenseAmounts     = d.expenseAmounts     || {};
       unexpectedExpenses = d.unexpectedExpenses || [];
-    }catch{ salary=0; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[]; }
+      _salary            = d.salary             || 0;
+      // 구버전 데이터 마이그레이션: salary → incomeItems
+      if(_salary>0 && incomeItems.length===0){
+        incomeItems=[{id:_salary*1000+1,purpose:'월급',amount:_salary,parentId:null,order:0}];
+      }
+    }catch{ incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[]; }
   } else {
-    salary=0; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
+    incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
   }
-  document.getElementById('salInput').value = salary||'';
   renderAll();
 }
 
@@ -407,30 +425,23 @@ function loadData(){
 function switchMode(m){ mode=m; editId=null; renderAll(); }
 
 // ═══════════════════════════════════════
-//  SALARY
-// ═══════════════════════════════════════
-function setSalary(){
-  const v=parseFloat(document.getElementById('salInput').value);
-  if(isNaN(v)||v<0){toast('올바른 금액을 입력해주세요.');return;}
-  salary=v; renderAll(); toast('월급이 설정되었습니다.');
-}
-
-// ═══════════════════════════════════════
 //  ADD ITEM
 // ═══════════════════════════════════════
 function addItem(){
-  const purpose = document.getElementById('purInput').value.trim();
-  const amount  = parseFloat(document.getElementById('amtInput').value);
+  const purpose=document.getElementById('purInput').value.trim();
+  const amount=parseFloat(document.getElementById('amtInput').value);
   if(!purpose){toast('목적을 입력해주세요.');return;}
   if(isNaN(amount)||amount<=0){toast('올바른 금액을 입력해주세요.');return;}
-
-  const id = Date.now();
-  if(mode==='budget'){
-    const maxOrder = budgetItems.filter(i=>i.parentId===null).reduce((m,i)=>Math.max(m,i.order),-1);
-    budgetItems.push({id, purpose, amount, parentId:null, order:maxOrder+1});
+  const id=Date.now();
+  if(mode==='income'){
+    const mo=incomeItems.filter(i=>i.parentId===null).reduce((m,i)=>Math.max(m,i.order),-1);
+    incomeItems.push({id,purpose,amount,parentId:null,order:mo+1});
+  } else if(mode==='budget'){
+    const mo=budgetItems.filter(i=>i.parentId===null).reduce((m,i)=>Math.max(m,i.order),-1);
+    budgetItems.push({id,purpose,amount,parentId:null,order:mo+1});
   } else {
-    const maxOrder = unexpectedExpenses.filter(i=>i.parentId===null).reduce((m,i)=>Math.max(m,i.order),-1);
-    unexpectedExpenses.push({id, purpose, amount, parentId:null, order:maxOrder+1});
+    const mo=unexpectedExpenses.filter(i=>i.parentId===null).reduce((m,i)=>Math.max(m,i.order),-1);
+    unexpectedExpenses.push({id,purpose,amount,parentId:null,order:mo+1});
   }
   document.getElementById('purInput').value='';
   document.getElementById('amtInput').value='';
@@ -441,20 +452,20 @@ function addItem(){
 // ═══════════════════════════════════════
 //  DELETE
 // ═══════════════════════════════════════
-function deleteItem(id, isBudget){
-  if(isBudget){
-    // also delete descendants
-    function collectDesc(pid){ return budgetItems.filter(i=>i.parentId===pid).flatMap(i=>[i.id,...collectDesc(i.id)]); }
-    const toRemove = new Set([id,...collectDesc(id)]);
-    budgetItems = budgetItems.filter(i=>!toRemove.has(i.id));
+function deleteItem(id, type){
+  function collectDesc(arr,pid){ return arr.filter(i=>i.parentId===pid).flatMap(i=>[i.id,...collectDesc(arr,i.id)]); }
+  if(type==='income'){
+    const toRemove=new Set([id,...collectDesc(incomeItems,id)]);
+    incomeItems=incomeItems.filter(i=>!toRemove.has(i.id));
+  } else if(type==='budget'||type===true){
+    const toRemove=new Set([id,...collectDesc(budgetItems,id)]);
+    budgetItems=budgetItems.filter(i=>!toRemove.has(i.id));
     toRemove.forEach(rid=>delete expenseAmounts[rid]);
-    // orphan unexpected that were sub-items
     unexpectedExpenses.forEach(u=>{ if(toRemove.has(u.parentId)) u.parentId=null; });
   } else {
-    // also delete sub-unexpected
     function collectUDesc(pid){ return unexpectedExpenses.filter(i=>i.parentId===pid).flatMap(i=>[i.id,...collectUDesc(i.id)]); }
-    const toRemove = new Set([id,...collectUDesc(id)]);
-    unexpectedExpenses = unexpectedExpenses.filter(i=>!toRemove.has(i.id));
+    const toRemove=new Set([id,...collectUDesc(id)]);
+    unexpectedExpenses=unexpectedExpenses.filter(i=>!toRemove.has(i.id));
   }
   if(editId===id) editId=null;
   renderAll();
@@ -463,22 +474,25 @@ function deleteItem(id, isBudget){
 // ═══════════════════════════════════════
 //  INLINE EDIT
 // ═══════════════════════════════════════
-function startEdit(id, isBudget){ editId=id; editType=isBudget?'budget':'unexp'; renderList(); requestAnimationFrame(()=>{ const el=document.getElementById(`ep-${id}`); if(el)el.focus(); }); }
+function startEdit(id,type){
+  editId=id; editType=type; renderList();
+  requestAnimationFrame(()=>{ const el=document.getElementById(`ep-${id}`); if(el)el.focus(); });
+}
 
 function saveEdit(id){
   const p=document.getElementById(`ep-${id}`).value.trim();
   const a=parseFloat(document.getElementById(`ea-${id}`).value);
   if(!p){toast('목적을 입력해주세요.');return;}
   if(isNaN(a)||a<=0){toast('올바른 금액을 입력해주세요.');return;}
-  const arr = editType==='budget' ? budgetItems : unexpectedExpenses;
-  const item = arr.find(i=>i.id===id);
+  const arr=editType==='income'?incomeItems:editType==='budget'?budgetItems:unexpectedExpenses;
+  const item=arr.find(i=>i.id===id);
   if(item){item.purpose=p; item.amount=a;}
   editId=null; renderAll(); toast('수정되었습니다.');
 }
 function cancelEdit(){ editId=null; renderList(); }
 
 // ═══════════════════════════════════════
-//  EXPENSE INPUT (partial update)
+//  EXPENSE INPUT
 // ═══════════════════════════════════════
 function updateExpRemain(id){
   const item=budgetItems.find(i=>i.id===id); if(!item) return;
@@ -487,10 +501,9 @@ function updateExpRemain(id){
   if(el){el.textContent=fw(r); el.className='exp-remain'+(r<0?' neg':'');}
 }
 
-function updateExpense(id, val){
+function updateExpense(id,val){
   const v=parseFloat(val); expenseAmounts[id]=(isNaN(v)||v<0)?0:v;
   updateExpRemain(id);
-  // 상위 항목 실제 지출을 하위 합산으로 자동 업데이트
   const item=budgetItems.find(i=>i.id===id);
   if(item){
     let pid=item.parentId;
@@ -507,13 +520,11 @@ function updateExpense(id, val){
 }
 
 function refreshExpTotals(){
-  const co=getCarryover(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU;
-  const finalR=salary+co-tAU;
-  const tB=budgetTotal();
+  const co=getCarryover(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU, tB=budgetTotal();
+  const finalR=totalIncome()+co-tAU;
   const elA=document.getElementById('etA'), elF=document.getElementById('efA');
   if(elA) elA.textContent=fw(tAU);
   if(elF){elF.textContent=fw(finalR); elF.className='exp-final-amt'+(finalR<0?' neg':'');}
-  // 합계행 예산/잔액
   const elTB=document.getElementById('etB'), elTR=document.getElementById('etR');
   if(elTB) elTB.textContent=fw(tB);
   if(elTR){elTR.textContent=fw(tB-tAU); elTR.className='exp-trem'+(tB-tAU<0?' neg':'');}
@@ -523,90 +534,86 @@ function refreshExpTotals(){
 //  RESET
 // ═══════════════════════════════════════
 function resetData(){
-  if(mode==='budget'){
+  if(mode==='income'){
+    if(!confirm('수입 데이터를 초기화하시겠습니까?'))return;
+    incomeItems=[];
+  } else if(mode==='budget'){
     if(!confirm('예산안 데이터를 초기화하시겠습니까?'))return;
-    salary=0; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
-    document.getElementById('salInput').value='';
+    budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
   } else {
     if(!confirm('지출 내역을 초기화하시겠습니까?'))return;
     expenseAmounts={}; unexpectedExpenses=[];
   }
-  editId=null; localStorage.removeItem(periodKey()); renderAll(); toast('초기화되었습니다.');
+  editId=null; renderAll(); toast('초기화되었습니다.');
 }
 
 // ═══════════════════════════════════════
 //  DRAG & DROP
 // ═══════════════════════════════════════
-function onDragStart(e, id, isBudget){
-  dndId=id; dndIsBudget=isBudget;
+function onDragStart(e,id,type){
+  dndId=id; dndType=type;
   e.dataTransfer.effectAllowed='move';
   setTimeout(()=>e.currentTarget.classList.add('dragging'),0);
 }
+function onDragEnd(e){ e.currentTarget.classList.remove('dragging'); clearDrop(); dndId=null; dndType=null; }
+function clearDrop(){ document.querySelectorAll('.drop-before,.drop-after,.drop-on').forEach(el=>el.classList.remove('drop-before','drop-after','drop-on')); }
 
-function onDragEnd(e){
-  e.currentTarget.classList.remove('dragging');
-  clearDrop(); dndId=null;
-}
-
-function clearDrop(){
-  document.querySelectorAll('.drop-before,.drop-after,.drop-on').forEach(el=>{
-    el.classList.remove('drop-before','drop-after','drop-on');
-  });
-}
-
-function onDragOver(e, targetId, isBudgetTarget){
-  e.preventDefault(); if(dndId===targetId)return;
+function onDragOver(e,targetId,targetType){
+  e.preventDefault(); if(dndId===targetId) return;
   clearDrop();
-  const el=e.currentTarget, rect=el.getBoundingClientRect(), pct=(e.clientY-rect.top)/rect.height;
-  const cls = pct<0.28?'drop-before':pct>0.72?'drop-after':'drop-on';
-  el.classList.add(cls); if(!isBudgetTarget) el.classList.add('ep');
-}
-
-function onDrop(e, targetId, isBudgetTarget){
-  e.preventDefault(); clearDrop();
-  if(!dndId||dndId===targetId)return;
   const rect=e.currentTarget.getBoundingClientRect(), pct=(e.clientY-rect.top)/rect.height;
-  const pos = pct<0.28?'before':pct>0.72?'after':'on';
-  performMove(dndId, dndIsBudget, targetId, isBudgetTarget, pos);
-  dndId=null; renderAll();
+  const cls=pct<0.28?'drop-before':pct>0.72?'drop-after':'drop-on';
+  e.currentTarget.classList.add(cls);
+  if(targetType==='budget') e.currentTarget.classList.add('bf');
+  else if(targetType==='unexp') e.currentTarget.classList.add('ep');
 }
 
-function performMove(dragId, dragIsBudget, targetId, targetIsBudget, pos){
-  const dragArr   = dragIsBudget ? budgetItems : unexpectedExpenses;
-  const targetArr = targetIsBudget ? budgetItems : unexpectedExpenses;
-  const drag   = dragArr.find(i=>i.id===dragId);
-  const target = targetArr.find(i=>i.id===targetId);
-  if(!drag||!target)return;
+function onDrop(e,targetId,targetType){
+  e.preventDefault(); clearDrop();
+  if(!dndId||dndId===targetId) return;
+  const rect=e.currentTarget.getBoundingClientRect(), pct=(e.clientY-rect.top)/rect.height;
+  const pos=pct<0.28?'before':pct>0.72?'after':'on';
+  performMove(dndId,dndType,targetId,targetType,pos);
+  dndId=null; dndType=null; renderAll();
+}
 
-  // prevent dropping onto own descendant
-  if(dragIsBudget && targetIsBudget){
-    function isDesc(pid){ return budgetItems.some(i=>i.parentId===pid&&(i.id===targetId||isDesc(i.id))); }
-    if(isDesc(dragId))return;
+function getArr(type){ return type==='income'?incomeItems:type==='budget'?budgetItems:unexpectedExpenses; }
+
+function performMove(dragId,dragType,targetId,targetType,pos){
+  // income ↔ income 또는 budget/unexp ↔ budget/unexp만 허용
+  const sameGroup=(dragType==='income'&&targetType==='income')||(dragType!=='income'&&targetType!=='income');
+  if(!sameGroup) return;
+
+  const dragArr=getArr(dragType), targetArr=getArr(targetType);
+  const drag=dragArr.find(i=>i.id===dragId), target=targetArr.find(i=>i.id===targetId);
+  if(!drag||!target) return;
+
+  // 자신의 하위로 drop 방지
+  if(dragType===targetType && dragType!=='unexp'){
+    function isDesc(pid){ return dragArr.some(i=>i.parentId===pid&&(i.id===targetId||isDesc(i.id))); }
+    if(isDesc(dragId)) return;
   }
 
-  const allArr = [...budgetItems, ...unexpectedExpenses];
-
+  const allArr=[...incomeItems,...budgetItems,...unexpectedExpenses];
   if(pos==='on'){
-    // Make drag a child of target
     const oldParent=drag.parentId;
     drag.parentId=targetId;
-    const newSibs=allArr.filter(i=>i.parentId===targetId&&i.id!==dragId);
-    drag.order=newSibs.length;
-    reorderSiblings(oldParent, dragId);
+    drag.order=allArr.filter(i=>i.parentId===targetId&&i.id!==dragId).length;
+    reorderSiblings(dragArr,oldParent,dragId);
   } else {
     const oldParent=drag.parentId;
     drag.parentId=target.parentId;
     const sibs=allArr.filter(i=>i.parentId===target.parentId&&i.id!==dragId).sort((a,b)=>a.order-b.order);
     const ti=sibs.findIndex(i=>i.id===targetId);
-    if(ti===-1){ drag.order=0; return; }
-    sibs.splice(pos==='before'?ti:ti+1, 0, drag);
+    if(ti===-1){drag.order=0;return;}
+    sibs.splice(pos==='before'?ti:ti+1,0,drag);
     sibs.forEach((it,idx)=>it.order=idx);
-    if(oldParent!==target.parentId) reorderSiblings(oldParent, dragId);
+    if(oldParent!==target.parentId) reorderSiblings(dragArr,oldParent,dragId);
   }
 }
 
-function reorderSiblings(parentId, excludeId){
-  const allArr=[...budgetItems,...unexpectedExpenses];
+function reorderSiblings(arr,parentId,excludeId){
+  const allArr=[...incomeItems,...budgetItems,...unexpectedExpenses];
   allArr.filter(i=>i.parentId===parentId&&i.id!==excludeId).sort((a,b)=>a.order-b.order).forEach((it,idx)=>it.order=idx);
 }
 
@@ -616,50 +623,58 @@ function reorderSiblings(parentId, excludeId){
 function renderAll(){ renderModeUI(); renderSummary(); renderList(); }
 
 function renderModeUI(){
-  const ib=mode==='budget';
+  const ii=mode==='income', ib=mode==='budget', ie=mode==='expense';
+  document.getElementById('tab-i').className='mode-tab'+(ii?' ia':'');
   document.getElementById('tab-b').className='mode-tab'+(ib?' ba':'');
-  document.getElementById('tab-e').className='mode-tab'+(!ib?' ea':'');
-  document.getElementById('salSec').style.display= ib?'':'none';
-  document.getElementById('coSec').style.display = !ib?'':'none';
-  document.getElementById('sumTitle').textContent  = ib?'예산 현황':'지출 현황';
-  document.getElementById('addTitle').textContent  = ib?'예산 항목 추가':'예상치 못한 지출 추가';
-  document.getElementById('purLbl').textContent    = ib?'예산 목적':'지출 목적';
-  document.getElementById('amtLbl').textContent    = ib?'예산 금액 (원)':'지출 금액 (원)';
-  document.getElementById('purInput').placeholder  = ib?'예) 식비, 교통비...':'예) 병원비, 긴급수리...';
-  document.getElementById('btnAdd').className      = 'btn-add'+(ib?'':' ep');
-  document.getElementById('listTitle').textContent = ib?'예산 항목':'지출 내역';
-  document.getElementById('listCnt').textContent   = ib ? budgetItems.length+'개' : budgetItems.length+unexpectedExpenses.length+'개';
+  document.getElementById('tab-e').className='mode-tab'+(ie?' ea':'');
 
-  // 이월 표시: 두 모드 모두에서, 이월이 있을 때만 표시
+  // 수입 요약 (예산안·지출 모드)
+  const incomeSec=document.getElementById('incomeSec');
+  incomeSec.style.display=(ib||ie)?'':'none';
+  if(ib||ie) document.getElementById('incomeTotalVal').textContent=fw(totalIncome());
+
+  // 이월 (수입 모드 제외, 이월 있을 때만)
   const co=getCarryover();
   const coSec=document.getElementById('coSec');
-  coSec.style.display = co!==0 ? '' : 'none';
-  if(co!==0){
+  coSec.style.display=(!ii&&co!==0)?'':'none';
+  if(!ii&&co!==0){
     document.getElementById('coVal').textContent=fw(co);
     document.getElementById('coBox').className='carryover-box'+(co<0?' neg':'');
   }
+
+  document.getElementById('sumTitle').textContent  = ii?'수입 현황':ib?'예산 현황':'지출 현황';
+  document.getElementById('addTitle').textContent  = ii?'수입 항목 추가':ib?'예산 항목 추가':'예상치 못한 지출 추가';
+  document.getElementById('purLbl').textContent    = ii?'수입 목적':ib?'예산 목적':'지출 목적';
+  document.getElementById('amtLbl').textContent    = ii?'수입 금액 (원)':ib?'예산 금액 (원)':'지출 금액 (원)';
+  document.getElementById('purInput').placeholder  = ii?'예) 월급, 부업, 이자...':ib?'예) 식비, 교통비...':'예) 병원비, 긴급수리...';
+  document.getElementById('btnAdd').className      = 'btn-add'+(ii?'':ib?' bf':' ep');
+  document.getElementById('listTitle').textContent = ii?'수입 항목':ib?'예산 항목':'지출 내역';
+  document.getElementById('listCnt').textContent   = ii?incomeItems.length+'개':ib?budgetItems.length+'개':(budgetItems.length+unexpectedExpenses.length)+'개';
 }
 
 function renderSummary(){
-  const ib=mode==='budget';
-  const co=getCarryover();
-  const avail=salary+co; // 이월 자동 합산
-  let items, pctUsed, over;
+  const ii=mode==='income', ib=mode==='budget';
+  const co=getCarryover(), ti=totalIncome();
+  let items, pctUsed=0, over=false;
 
-  if(ib){
-    const used=budgetTotal(), remain=avail-used;
+  if(ii){
+    items=[
+      {l:'총 수입',   v:ti,                                          c:'c-green'},
+      {l:'수입 항목', v:incomeItems.filter(i=>i.parentId===null).length+'개', c:'c-blue', isText:true},
+    ];
+  } else if(ib){
+    const avail=ti+co, used=budgetTotal(), remain=avail-used;
     pctUsed=avail>0?Math.min(used/avail*100,100):0; over=remain<0;
     items=[
-      {l:co!==0?'월급+이월':'월급', v:avail,  c:'c-blue'},
-      {l:'예산 지출',               v:used,   c:'c-red'},
-      {l:'잔액',                    v:remain, c:remain<0?'c-red':'c-green'},
+      {l:co!==0?'총 수입+이월':'총 수입', v:avail,  c:'c-green'},
+      {l:'예산 지출',                     v:used,   c:'c-red'},
+      {l:'잔액',                          v:remain, c:remain<0?'c-red':'c-blue'},
     ];
   } else {
-    const tA=actualTotal(), tU=unexpTotal(), total=tA+tU;
-    const remain=avail-total;
+    const avail=ti+co, tA=actualTotal(), tU=unexpTotal(), total=tA+tU, remain=avail-total;
     pctUsed=avail>0?Math.min(total/avail*100,100):0; over=remain<0;
     items=[
-      {l:co!==0?'사용가능(이월포함)':'사용 가능', v:avail,  c:'c-blue'},
+      {l:co!==0?'총 수입+이월':'총 수입', v:avail,  c:'c-green'},
       {l:'실제 지출',   v:tA,     c:'c-red'},
       {l:'예상외 지출', v:tU,     c:'c-purple'},
       {l:'최종 잔액',   v:remain, c:remain<0?'c-red':'c-purple'},
@@ -667,89 +682,110 @@ function renderSummary(){
   }
 
   const grid=document.getElementById('sumGrid');
-  grid.style.gridTemplateColumns=ib?'repeat(3,1fr)':'repeat(2,1fr)';
-  grid.innerHTML=items.map(it=>`
-    <div class="sum-item"><div class="sl">${it.l}</div><div class="sv ${it.c}">${fw(it.v)}</div></div>`).join('');
+  grid.style.gridTemplateColumns=ii?'1fr 1fr':ib?'repeat(3,1fr)':'repeat(2,1fr)';
+  grid.innerHTML=items.map(it=>`<div class="sum-item"><div class="sl">${it.l}</div><div class="sv ${it.c}">${it.isText?it.v:fw(it.v)}</div></div>`).join('');
 
   const fill=document.getElementById('progFill');
-  fill.style.width=pctUsed+'%';
-  fill.className='prog-fill'+(over?' ov':ib?' b':' e');
-  document.getElementById('progPct').textContent=pctUsed.toFixed(1)+'% 사용';
+  if(ii){ fill.style.width='0%'; fill.className='prog-fill ia'; document.getElementById('progPct').textContent=''; }
+  else { fill.style.width=pctUsed+'%'; fill.className='prog-fill'+(over?' ov':ib?' b':' e'); document.getElementById('progPct').textContent=pctUsed.toFixed(1)+'% 사용'; }
 }
 
 // ═══════════════════════════════════════
 //  RENDER LIST
 // ═══════════════════════════════════════
 function renderList(){
-  if(mode==='budget') renderBudgetList();
-  else               renderExpenseList();
+  if(mode==='income') renderIncomeList();
+  else if(mode==='budget') renderBudgetList();
+  else renderExpenseList();
 }
 
-// ── budget mode list (tree with DnD + bracket) ──
-function renderBudgetList(){
-  const list=document.getElementById('itemList');
-  const roots=budgetItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
-  if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 예산 항목이 없습니다.');return;}
-  const total=budgetTotal();
+// ── 공통 트리 렌더러 ──
+function makeTreeRenderer(arr, total, type, amtPrefix, amtClass){
   let cnt=0;
-  function renderItem(item,depth){
+  const isIA=type==='income', isBF=type==='budget';
+  const editCls=isIA?'':isBF?' bf':' ep';
+  const okCls=isIA?'':isBF?' bf':' ep';
+  const numCls=isIA?' ia':isBF?'':' ep';
+  const kidCls=isIA?'has-kids-ia':'has-kids';
+  const bsrCls=isIA?' ia-bsr':'';
+  const bsrLblCls=isIA?' ia':'';
+  const bsrValCls=isIA?' ia':'';
+
+  function renderItem(item, depth){
     cnt++;
     const myNum=cnt;
-    const children=budgetItems.filter(i=>i.parentId===item.id).sort((a,b)=>a.order-b.order);
+    const children=arr.filter(i=>i.parentId===item.id).sort((a,b)=>a.order-b.order);
     const hasKids=children.length>0;
     const pct=total>0?((item.amount/total)*100).toFixed(1):'0.0';
     const indent=depth*24;
     let html='';
     if(item.id===editId){
-      html+=`<div class="tree-item editing" style="padding-left:${indent+12}px">
+      html+=`<div class="tree-item editing${editCls}" style="padding-left:${indent+12}px">
         <div class="edit-form">
-          <input class="ei ei-p" id="ep-${item.id}" value="${esc(item.purpose)}"
+          <input class="ei ei-p${editCls}" id="ep-${item.id}" value="${esc(item.purpose)}"
             onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
-          <input class="ei ei-a" id="ea-${item.id}" type="number" value="${item.amount}"
+          <input class="ei ei-a${editCls}" id="ea-${item.id}" type="number" value="${item.amount}"
             onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
-          <button class="btn-ok" onclick="saveEdit(${item.id})">저장</button>
+          <button class="btn-ok${okCls}" onclick="saveEdit(${item.id})">저장</button>
           <button class="btn-cx" onclick="cancelEdit()">취소</button>
         </div>
       </div>`;
     } else {
-      html+=`<div class="tree-item${hasKids?' has-kids':''}" style="padding-left:${indent+4}px"
+      html+=`<div class="tree-item${hasKids?' '+kidCls:''}" style="padding-left:${indent+4}px"
         id="ti-${item.id}" draggable="true"
-        ondragstart="onDragStart(event,${item.id},true)" ondragend="onDragEnd(event)"
-        ondragover="onDragOver(event,${item.id},true)" ondragleave="clearDrop()"
-        ondrop="onDrop(event,${item.id},true)">
+        ondragstart="onDragStart(event,${item.id},'${type}')" ondragend="onDragEnd(event)"
+        ondragover="onDragOver(event,${item.id},'${type}')" ondragleave="clearDrop()"
+        ondrop="onDrop(event,${item.id},'${type}')">
         <div class="drag-handle">${dragIcon()}</div>
-        <div class="item-num">${myNum}</div>
+        <div class="item-num${numCls}">${myNum}</div>
         <div class="item-purpose" title="${esc(item.purpose)}">${esc(item.purpose)}</div>
         <div class="item-pct">${pct}%</div>
-        <div class="item-amt">-${fw(item.amount)}</div>
+        <div class="item-amt${amtClass}">${amtPrefix}${fw(item.amount)}</div>
         <div style="display:flex;gap:3px;flex-shrink:0">
-          <button class="btn-ico edit" onclick="startEdit(${item.id},true)">${editIcon()}</button>
-          <button class="btn-ico del"  onclick="deleteItem(${item.id},true)">${delIcon()}</button>
+          <button class="btn-ico edit" onclick="startEdit(${item.id},'${type}')">${editIcon()}</button>
+          <button class="btn-ico del"  onclick="deleteItem(${item.id},'${type}')">${delIcon()}</button>
         </div>
       </div>`;
     }
     if(hasKids){
-      const childIndent=(depth+1)*24+4;
-      html+=`<div class="bracket-group" style="--bi:${childIndent}px">`;
+      const ci=(depth+1)*24+4;
+      html+=`<div class="bracket-group">`;
       children.forEach(c=>{ html+=renderItem(c,depth+1); });
-      html+=`<div class="bracket-sum-row" style="padding-left:${childIndent}px">
-        <span class="bsr-label">하위 합계</span>
-        <span class="bsr-val">${fw(childrenAmtSum(item.id))}</span>
+      html+=`<div class="bracket-sum-row${bsrCls}" style="padding-left:${ci}px">
+        <span class="bsr-label${bsrLblCls}">하위 합계</span>
+        <span class="bsr-val${bsrValCls}">${amtPrefix}${fw(childrenAmtSum(arr,item.id))}</span>
       </div></div>`;
     }
     return html;
   }
+  return renderItem;
+}
+
+function renderIncomeList(){
+  const list=document.getElementById('itemList');
+  const roots=incomeItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
+  if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 수입 항목이 없습니다.');return;}
+  const renderItem=makeTreeRenderer(incomeItems,totalIncome(),'income','+','.ia');
   list.innerHTML=roots.map(r=>renderItem(r,0)).join('');
 }
 
-function flatBudget(parentId, depth){
-  return budgetItems.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order)
-    .flatMap(item=>[{item,depth},...flatBudget(item.id,depth+1)]);
+function renderBudgetList(){
+  const list=document.getElementById('itemList');
+  const roots=budgetItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
+  if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 예산 항목이 없습니다.');return;}
+  const renderItem=makeTreeRenderer(budgetItems,budgetTotal(),'budget','-','');
+  list.innerHTML=roots.map(r=>renderItem(r,0)).join('');
 }
 
-// 하위가 있는 항목의 실제지출 초기값: 하위 합산 (미설정 시만)
+function flatArr(arr,parentId,depth){
+  return arr.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order)
+    .flatMap(item=>[{item,depth},...flatArr(arr,item.id,depth+1)]);
+}
+
+// ═══════════════════════════════════════
+//  EXPENSE MODE
+// ═══════════════════════════════════════
 function initParentExpenses(){
-  // 깊이 역순(깊은 것 먼저) 처리
   function depth(id,d=0){ const it=budgetItems.find(i=>i.id===id); return it?.parentId?depth(it.parentId,d+1):d; }
   budgetItems.filter(item=>budgetItems.some(i=>i.parentId===item.id))
     .sort((a,b)=>depth(b.id)-depth(a.id))
@@ -759,20 +795,15 @@ function initParentExpenses(){
     });
 }
 
-// ── expense mode list (table) ──
 function renderExpenseList(){
   const list=document.getElementById('itemList');
   if(budgetItems.length===0&&unexpectedExpenses.length===0){
     list.innerHTML=emptyHtml('예산안 모드에서 예산 항목을 추가하거나,<br>예상치 못한 지출을 추가해주세요.'); return;
   }
   initParentExpenses();
-
-  const co=getCarryover(), tB=budgetTotal(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU;
-  const finalR=salary+co-tAU;
-
-  // build flat rows (budget items + unexpected expenses interleaved by tree)
-  const rows=buildExpenseRows(null, 0);
-
+  const co=getCarryover(), ti=totalIncome(), tB=budgetTotal(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU;
+  const finalR=ti+co-tAU;
+  const rows=buildExpenseRows(null,0);
   list.innerHTML=`
     <div class="exp-table">
       <div class="exp-row exp-hdr">
@@ -786,75 +817,62 @@ function renderExpenseList(){
         <div class="exp-total-lbl">합계</div>
         <div class="exp-tbamt" id="etB">${fw(tB)}</div>
         <div class="exp-tact" id="etA">${fw(tAU)}</div>
-        <div class="exp-trem ${tB-tAU<0?'neg':''}" id="etR">${fw(tB-tAU)}</div>
+        <div class="exp-trem${tB-tAU<0?' neg':''}" id="etR">${fw(tB-tAU)}</div>
       </div>
     </div>
-    ${co!==0?`<div class="exp-co-row"><span class="exp-co-lbl">전월 이월 포함</span><span class="exp-co-amt" id="eCo">${fw(co)}</span></div>`:''}
+    ${co!==0?`<div class="exp-co-row"><span class="exp-co-lbl">전월 이월</span><span class="exp-co-amt">${fw(co)}</span></div>`:''}
     <div class="exp-final">
-      <span class="exp-final-lbl">최종 잔액 (사용가능 − 실제지출 − 예상외)</span>
+      <span class="exp-final-lbl">최종 잔액 (총 수입+이월 − 실제지출 − 예상외)</span>
       <span class="exp-final-amt${finalR<0?' neg':''}" id="efA">${fw(finalR)}</span>
     </div>`;
 }
 
-function buildExpenseRows(parentId, depth){
+function buildExpenseRows(parentId,depth){
   const result=[];
-  // budget items at this level
   budgetItems.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order).forEach(item=>{
-    result.push({type:'budget', item, depth});
-    // unexpected sub-items of this budget item
+    result.push({type:'budget',item,depth});
     unexpectedExpenses.filter(u=>u.parentId===item.id).sort((a,b)=>a.order-b.order).forEach(u=>{
-      result.push({type:'unexp', item:u, depth:depth+1, draggable:true});
+      result.push({type:'unexp',item:u,depth:depth+1});
     });
-    // budget children
-    const children=buildExpenseRows(item.id, depth+1);
-    result.push(...children);
+    result.push(...buildExpenseRows(item.id,depth+1));
   });
-  // standalone unexpected (parentId=null) only at root
   if(parentId===null){
     unexpectedExpenses.filter(u=>u.parentId===null).sort((a,b)=>a.order-b.order).forEach(u=>{
-      result.push({type:'unexp', item:u, depth:0, draggable:true});
+      result.push({type:'unexp',item:u,depth:0});
     });
   }
   return result;
 }
 
-function renderExpRow({type,item,depth,draggable}, idx){
+function renderExpRow({type,item,depth},idx){
   const indent=depth*22;
-  const isBudget=type==='budget';
-
-  if(isBudget){
+  if(type==='budget'){
     const hasKids=budgetItems.some(i=>i.parentId===item.id);
-    const actual=expenseAmounts[item.id]||0;
-    const remain=item.amount-actual;
-    const rowBg=hasKids?'background:#f8fafc;':'';
-    const nameBold=hasKids?'font-weight:700;':'';
-    const dndAttrs=`draggable="true"
-      ondragstart="onDragStart(event,${item.id},true)" ondragend="onDragEnd(event)"
-      ondragover="onDragOver(event,${item.id},true)" ondragleave="clearDrop()"
-      ondrop="onDrop(event,${item.id},true)"`;
-    return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${rowBg}" ${dndAttrs}>
+    const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
+    return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${hasKids?'background:#f8fafc;':''}"
+      draggable="true"
+      ondragstart="onDragStart(event,${item.id},'budget')" ondragend="onDragEnd(event)"
+      ondragover="onDragOver(event,${item.id},'budget')" ondragleave="clearDrop()"
+      ondrop="onDrop(event,${item.id},'budget')">
       <div class="item-num">${idx}</div>
-      <div class="exp-name" style="${nameBold}">${esc(item.purpose)}</div>
+      <div class="exp-name" style="${hasKids?'font-weight:700;':''}">${esc(item.purpose)}</div>
       <div class="exp-bamt">${fw(item.amount)}</div>
       <input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000"
         oninput="updateExpense(${item.id},this.value)"/>
       <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
     </div>`;
   } else {
-    // unexpected expense row (draggable in expense mode)
-    const dndAttrs=`draggable="true"
-      ondragstart="onDragStart(event,${item.id},false)"
-      ondragend="onDragEnd(event)"
-      ondragover="onDragOver(event,${item.id},false)"
-      ondragleave="clearDrop()"
-      ondrop="onDrop(event,${item.id},false)"`;
-    return `<div class="exp-row exp-item unexp-row" style="padding-left:${indent+2}px" ${dndAttrs}>
+    return `<div class="exp-row exp-item unexp-row" style="padding-left:${indent+2}px"
+      draggable="true"
+      ondragstart="onDragStart(event,${item.id},'unexp')" ondragend="onDragEnd(event)"
+      ondragover="onDragOver(event,${item.id},'unexp')" ondragleave="clearDrop()"
+      ondrop="onDrop(event,${item.id},'unexp')">
       <div class="item-num unexp">${idx}</div>
       <div class="exp-name"><span>${esc(item.purpose)}</span><span class="unexp-badge">예상외</span></div>
       <div class="exp-bamt" style="color:#9333ea">${fw(item.amount)}</div>
       <div class="exp-input" style="display:flex;align-items:center;justify-content:flex-end;font-size:.8rem;color:#9333ea;font-weight:600;">지출됨</div>
       <div style="display:flex;gap:3px;justify-content:flex-end">
-        <button class="btn-ico del" onclick="deleteItem(${item.id},false)" title="삭제">${delIcon()}</button>
+        <button class="btn-ico del" onclick="deleteItem(${item.id},'unexp')">${delIcon()}</button>
       </div>
     </div>`;
   }
@@ -866,32 +884,49 @@ function renderExpRow({type,item,depth,draggable}, idx){
 function exportExcel(){
   const year=document.getElementById('yearSel').value, month=document.getElementById('monthSel').value;
   const wb=XLSX.utils.book_new();
-  const co=getCarryover();
+  const co=getCarryover(), ti=totalIncome();
 
-  // Sheet 1: 예산안
-  const flat=flatBudget(null,0);
+  // Sheet 1: 수입
+  const flatI=flatArr(incomeItems,null,0);
+  const iData=[
+    [`${year}년 ${month}월 수입 내역`],[],
+    ['총 수입',ti],[],
+    ['번호','수입 목적','레벨','금액(원)','하위여부'],
+    ...flatI.map(({item,depth},i)=>{
+      const hasKids=incomeItems.some(c=>c.parentId===item.id);
+      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(incomeItems,item.id))}`:''];
+    }),
+    [],['','합계','',ti,''],
+  ];
+  const ws0=XLSX.utils.aoa_to_sheet(iData);
+  ws0['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14},{wch:18}];
+  ws0['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}}];
+  XLSX.utils.book_append_sheet(wb,ws0,'수입');
+
+  // Sheet 2: 예산안
+  const flatB=flatArr(budgetItems,null,0);
   const bData=[
     [`${year}년 ${month}월 예산안`],[],
-    ['월급',salary],['이월',co],['사용 가능',salary+co],
-    ['총 예산 지출',budgetTotal()],['예산 잔액',salary+co-budgetTotal()],[],
+    ['총 수입',ti],['전월 이월',co],['사용 가능',ti+co],
+    ['총 예산 지출',budgetTotal()],['예산 잔액',ti+co-budgetTotal()],[],
     ['번호','예산 목적','레벨','금액(원)','하위여부'],
-    ...flat.map(({item,depth},i)=>{
+    ...flatB.map(({item,depth},i)=>{
       const hasKids=budgetItems.some(c=>c.parentId===item.id);
-      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(item.id))}`:''];
+      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(budgetItems,item.id))}`:''];
     }),
     [],['','합계','',budgetTotal(),''],
   ];
   const ws1=XLSX.utils.aoa_to_sheet(bData);
-  ws1['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14}];
-  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}}];
+  ws1['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14},{wch:18}];
+  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}}];
   XLSX.utils.book_append_sheet(wb,ws1,'예산안');
 
-  // Sheet 2: 지출내역
-  const tA=actualTotal(), tU=unexpTotal(), finalR=salary+co-tA-tU;
+  // Sheet 3: 지출내역
+  const tA=actualTotal(), tU=unexpTotal(), finalR=ti+co-tA-tU;
   const rows=buildExpenseRows(null,0);
   const eData=[
     [`${year}년 ${month}월 지출 내역`],[],
-    ['사용 가능(월급+이월)',salary+co],['실제 지출',tA],['예상외 지출',tU],['최종 잔액',finalR],[],
+    ['총 수입+이월',ti+co],['실제 지출',tA],['예상외 지출',tU],['최종 잔액',finalR],[],
     ['번호','항목','레벨','예산','실제 지출','잔액'],
     ...rows.map(({type,item,depth},i)=>{
       if(type==='budget'){
