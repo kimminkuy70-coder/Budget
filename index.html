@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>수입·예산 관리</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
@@ -20,12 +20,33 @@
     .card { background:white; border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
     .card-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#94a3b8; margin-bottom:10px; }
 
-    /* ── mode tabs (3개) ── */
+    /* ── mode tabs (4개) ── */
     .mode-tabs { display:flex; background:white; border-radius:14px; padding:6px; box-shadow:0 2px 8px rgba(0,0,0,.06); gap:4px; }
-    .mode-tab { flex:1; padding:9px 4px; border:none; border-radius:10px; background:transparent; cursor:pointer; font-size:.8rem; font-weight:600; color:#94a3b8; transition:all .2s; }
+    .mode-tab { flex:1; padding:9px 4px; border:none; border-radius:10px; background:transparent; cursor:pointer; font-size:.75rem; font-weight:600; color:#94a3b8; transition:all .2s; }
     .mode-tab.ia { background:#059669; color:white; box-shadow:0 2px 8px rgba(5,150,105,.3); }
     .mode-tab.ba { background:#1e40af; color:white; box-shadow:0 2px 8px rgba(30,64,175,.3); }
     .mode-tab.ea { background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,.3); }
+    .mode-tab.sa { background:#0f766e; color:white; box-shadow:0 2px 8px rgba(15,118,110,.3); }
+
+    /* ── stats view ── */
+    .stat-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .stat-hdr th { background:#f8fafc; font-size:.68rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; padding:10px 12px; border-bottom:2px solid #e2e8f0; text-align:right; white-space:nowrap; }
+    .stat-hdr th:first-child { text-align:left; }
+    .stat-row td { padding:10px 12px; border-bottom:1px solid #f8fafc; font-size:.83rem; vertical-align:middle; text-align:right; }
+    .stat-row td:first-child { text-align:left; font-weight:700; color:#1e293b; }
+    .stat-row:hover td { background:#fafafa; }
+    .stat-row.empty td { color:#cbd5e1; font-size:.8rem; }
+    .stat-bar-bg { flex:1; height:5px; background:#e2e8f0; border-radius:3px; overflow:hidden; }
+    .stat-bar-fill { height:100%; border-radius:3px; transition:width .4s; }
+    .stat-bar-fill.income { background:linear-gradient(90deg,#059669,#34d399); }
+    .stat-bar-fill.spent  { background:linear-gradient(90deg,#7c3aed,#a855f7); }
+    .stat-bars { display:flex; flex-direction:column; gap:3px; margin-top:5px; }
+    .stat-bar-row { display:flex; align-items:center; gap:6px; }
+    .stat-bar-lbl { font-size:.6rem; color:#94a3b8; width:22px; text-align:right; flex-shrink:0; }
+    .stat-annual { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:18px; }
+    .stat-annual-item { background:#f8fafc; border-radius:10px; padding:10px; text-align:center; }
+    .stat-annual-item .sl { font-size:.68rem; color:#64748b; font-weight:600; margin-bottom:4px; }
+    .stat-annual-item .sv { font-size:.9rem; font-weight:700; }
 
     /* period */
     .period-row { display:flex; gap:8px; margin-bottom:0; }
@@ -235,6 +256,7 @@
       <button class="mode-tab ia" id="tab-i" onclick="switchMode('income')">수입 관리</button>
       <button class="mode-tab"   id="tab-b" onclick="switchMode('budget')">예산안</button>
       <button class="mode-tab"   id="tab-e" onclick="switchMode('expense')">지출 내역</button>
+      <button class="mode-tab"   id="tab-s" onclick="switchMode('stats')">통계</button>
     </div>
 
     <!-- 기간 + 수입 요약 / 이월 -->
@@ -289,14 +311,13 @@
         <button class="btn-act btn-save" onclick="saveData()">💾 저장</button>
         <button class="btn-act btn-rst"  onclick="resetData()">초기화</button>
       </div>
-      <button class="btn-act btn-xl" onclick="exportExcel()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
-        </svg>
-        Excel 내보내기
-      </button>
+      <div class="act-row">
+        <button class="btn-act btn-xl" onclick="exportExcel()" style="flex:1">📤 내보내기</button>
+        <label class="btn-act btn-xl" style="flex:1;cursor:pointer;background:#0f766e;display:flex;align-items:center;justify-content:center;gap:5px">
+          📥 불러오기
+          <input type="file" id="xlImport" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)"/>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -644,39 +665,74 @@ function reorderSiblings(arr,parentId,excludeId){
 function renderAll(){ renderModeUI(); renderSummary(); renderList(); }
 
 function renderModeUI(){
-  const ii=mode==='income', ib=mode==='budget', ie=mode==='expense';
+  const ii=mode==='income', ib=mode==='budget', ie=mode==='expense', is=mode==='stats';
   document.getElementById('tab-i').className='mode-tab'+(ii?' ia':'');
   document.getElementById('tab-b').className='mode-tab'+(ib?' ba':'');
   document.getElementById('tab-e').className='mode-tab'+(ie?' ea':'');
+  document.getElementById('tab-s').className='mode-tab'+(is?' sa':'');
 
   // 수입 요약 (예산안·지출 모드)
   const incomeSec=document.getElementById('incomeSec');
   incomeSec.style.display=(ib||ie)?'':'none';
   if(ib||ie) document.getElementById('incomeTotalVal').textContent=fw(totalIncome());
 
-  // 이월 (수입 모드 제외, 이월 있을 때만)
+  // 이월 (수입·통계 모드 제외)
   const co=getCarryover();
   const coSec=document.getElementById('coSec');
-  coSec.style.display=(!ii&&co!==0)?'':'none';
-  if(!ii&&co!==0){
+  coSec.style.display=(!ii&&!is&&co!==0)?'':'none';
+  if(!ii&&!is&&co!==0){
     document.getElementById('coVal').textContent=fw(co);
     document.getElementById('coBox').className='carryover-box'+(co<0?' neg':'');
   }
 
-  document.getElementById('sumTitle').textContent  = ii?'수입 현황':ib?'예산 현황':'지출 현황';
-  document.getElementById('addTitle').textContent  = ii?'수입 항목 추가':ib?'예산 항목 추가':'세부 내역';
-  document.getElementById('purLbl').textContent    = ii?'수입 목적':ib?'예산 목적':'지출 목적';
-  document.getElementById('amtLbl').textContent    = ii?'수입 금액 (원)':ib?'예산 금액 (원)':'지출 금액 (원)';
-  document.getElementById('purInput').placeholder  = ii?'예) 월급, 부업, 이자...':ib?'예) 식비, 교통비...':'예) 병원비, 긴급수리...';
-  document.getElementById('btnAdd').className      = 'btn-add'+(ii?'':ib?' bf':' ep');
-  document.getElementById('listTitle').textContent = ii?'수입 항목':ib?'예산 항목':'지출 내역';
-  document.getElementById('listCnt').textContent   = ii?incomeItems.length+'개':ib?budgetItems.length+'개':(budgetItems.length+unexpectedExpenses.length)+'개';
+  // 통계 모드: 추가 폼 숨김
+  document.getElementById('addCard').style.display=is?'none':'';
+
+  document.getElementById('sumTitle').textContent  = ii?'수입 현황':ib?'예산 현황':ie?'지출 현황':'연간 현황';
+  if(!is){
+    document.getElementById('addTitle').textContent  = ii?'수입 항목 추가':ib?'예산 항목 추가':'세부 내역';
+    document.getElementById('purLbl').textContent    = ii?'수입 목적':ib?'예산 목적':'지출 목적';
+    document.getElementById('amtLbl').textContent    = ii?'수입 금액 (원)':ib?'예산 금액 (원)':'지출 금액 (원)';
+    document.getElementById('purInput').placeholder  = ii?'예) 월급, 부업, 이자...':ib?'예) 식비, 교통비...':'예) 병원비, 긴급수리...';
+    document.getElementById('btnAdd').className      = 'btn-add'+(ii?'':ib?' bf':' ep');
+  }
+  document.getElementById('listTitle').textContent = ii?'수입 항목':ib?'예산 항목':ie?'지출 내역':'월별 현금 흐름';
+  document.getElementById('listCnt').textContent   = ii?incomeItems.length+'개':ib?budgetItems.length+'개':ie?(budgetItems.length+unexpectedExpenses.length)+'개':'';
 }
 
 function renderSummary(){
-  const ii=mode==='income', ib=mode==='budget';
+  const ii=mode==='income', ib=mode==='budget', is=mode==='stats';
   const co=getCarryover(), ti=totalIncome();
   let items, pctUsed=0, over=false;
+
+  if(is){
+    const yr=document.getElementById('yearSel').value;
+    let aIncome=0, aSpent=0;
+    for(let m=1;m<=12;m++){
+      const raw=localStorage.getItem(`budget_${yr}_${m}`);
+      if(!raw) continue;
+      try{
+        const d=JSON.parse(raw);
+        aIncome+=(d.incomeItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
+        aSpent+=(d.budgetItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+((d.expenseAmounts||{})[i.id]||0),0);
+        aSpent+=(d.unexpectedExpenses||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
+      }catch{}
+    }
+    const aRemain=aIncome-aSpent;
+    items=[
+      {l:'연간 수입', v:aIncome,  c:'c-green'},
+      {l:'연간 지출', v:aSpent,   c:'c-red'},
+      {l:'연간 잔액', v:aRemain,  c:aRemain<0?'c-red':'c-blue'},
+    ];
+    pctUsed=aIncome>0?Math.min(aSpent/aIncome*100,100):0; over=aRemain<0;
+    const grid=document.getElementById('sumGrid');
+    grid.style.gridTemplateColumns='repeat(3,1fr)';
+    grid.innerHTML=items.map(it=>`<div class="sum-item"><div class="sl">${it.l}</div><div class="sv ${it.c}">${fw(it.v)}</div></div>`).join('');
+    const fill=document.getElementById('progFill');
+    fill.style.width=pctUsed+'%'; fill.className='prog-fill'+(over?' ov':' e');
+    document.getElementById('progPct').textContent=pctUsed.toFixed(1)+'% 사용';
+    return;
+  }
 
   if(ii){
     items=[
@@ -717,7 +773,8 @@ function renderSummary(){
 function renderList(){
   if(mode==='income') renderIncomeList();
   else if(mode==='budget') renderBudgetList();
-  else renderExpenseList();
+  else if(mode==='expense') renderExpenseList();
+  else renderStatsView();
 }
 
 // ── 공통 트리 렌더러 ──
@@ -936,71 +993,263 @@ function saveUnexp(id){
 }
 
 // ═══════════════════════════════════════
+//  STATS VIEW
+// ═══════════════════════════════════════
+function renderStatsView(){
+  const list=document.getElementById('itemList');
+  const yr=document.getElementById('yearSel').value;
+  const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const rows=[];
+  let maxVal=1;
+  for(let m=1;m<=12;m++){
+    const raw=localStorage.getItem(`budget_${yr}_${m}`);
+    if(!raw){rows.push({m,empty:true});continue;}
+    try{
+      const d=JSON.parse(raw);
+      const income=(d.incomeItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
+      const spent=(d.budgetItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+((d.expenseAmounts||{})[i.id]||0),0)
+                 +(d.unexpectedExpenses||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
+      maxVal=Math.max(maxVal,income,spent);
+      rows.push({m,income,spent,remain:income-spent,empty:false});
+    }catch{rows.push({m,empty:true});}
+  }
+  const hasAny=rows.some(r=>!r.empty);
+  if(!hasAny){list.innerHTML=emptyHtml('아직 저장된 데이터가 없습니다.');return;}
+
+  list.innerHTML=`
+    <table class="stat-table">
+      <thead class="stat-hdr"><tr>
+        <th style="text-align:left">월</th>
+        <th>수입</th><th>지출</th><th>잔액</th><th style="min-width:120px">현황</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r=>{
+          if(r.empty) return `<tr class="stat-row empty"><td>${months[r.m-1]}</td><td colspan="4" style="text-align:center">—</td></tr>`;
+          const pct=r.income>0?Math.min(r.spent/r.income*100,100):0;
+          const iW=(r.income/maxVal*100).toFixed(1), sW=(r.spent/maxVal*100).toFixed(1);
+          return `<tr class="stat-row">
+            <td>${months[r.m-1]}</td>
+            <td class="c-green">${fw(r.income)}</td>
+            <td class="c-red">${fw(r.spent)}</td>
+            <td class="${r.remain<0?'c-red':'c-blue'}">${fw(r.remain)}</td>
+            <td>
+              <div style="font-size:.7rem;color:#94a3b8;text-align:right;margin-bottom:3px">${pct.toFixed(1)}% 사용</div>
+              <div class="stat-bars">
+                <div class="stat-bar-row"><span class="stat-bar-lbl">수입</span><div class="stat-bar-bg"><div class="stat-bar-fill income" style="width:${iW}%"></div></div></div>
+                <div class="stat-bar-row"><span class="stat-bar-lbl">지출</span><div class="stat-bar-bg"><div class="stat-bar-fill spent" style="width:${sW}%"></div></div></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ═══════════════════════════════════════
 //  EXCEL
 // ═══════════════════════════════════════
+// ─── Excel 스타일 헬퍼 ───────────────────
+function xc(v, s={}){ const t=typeof v==='number'?'n':'s'; return {v:v??'',t,s}; }
+function xlBdr(){ return {top:{style:'thin',color:{rgb:'CBD5E1'}},bottom:{style:'thin',color:{rgb:'CBD5E1'}},left:{style:'thin',color:{rgb:'CBD5E1'}},right:{style:'thin',color:{rgb:'CBD5E1'}}}; }
+function xlHdrStyle(rgb){ return {font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{top:{style:'medium',color:{rgb}},bottom:{style:'medium',color:{rgb}},left:{style:'medium',color:{rgb}},right:{style:'medium',color:{rgb}}}}; }
+function xlDataStyle(align='left'){ return {alignment:{horizontal:align,vertical:'center'},border:xlBdr()}; }
+function xlAmtStyle(neg=false){ return {font:{color:{rgb:neg?'DC2626':'374151'}},alignment:{horizontal:'right',vertical:'center'},border:xlBdr()}; }
+function xlTotalStyle(rgb){ return {font:{bold:true,color:{rgb}},fill:{fgColor:{rgb:'F1F5F9'}},alignment:{horizontal:'right',vertical:'center'},border:xlBdr()}; }
+function xlSumLbl(){ return {font:{bold:true,color:{rgb:'475569'}},alignment:{horizontal:'left'}}; }
+function xlSumVal(rgb){ return {font:{bold:true,color:{rgb}},alignment:{horizontal:'right'}}; }
+function xlTitle(){ return {font:{bold:true,sz:13,color:{rgb:'1E293B'}},alignment:{horizontal:'left',vertical:'center'}}; }
+
+function buildItemRows(arr, amtColIdx, extraCols=[]){
+  // Returns [row arrays] where depth=0 goes to col1, depth>=1 goes to col2
+  const rows=[];
+  let cnt=0;
+  function walk(parentId, depth){
+    arr.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order).forEach(item=>{
+      cnt++;
+      const isRoot=depth===0;
+      const name=('  '.repeat(Math.max(0,depth-1)))+item.purpose;
+      const amtCell=xc(item.amount,xlAmtStyle());
+      const numCell=xc(cnt,xlDataStyle('center'));
+      if(isRoot) rows.push([numCell, xc(item.purpose,xlDataStyle()), xc('',xlDataStyle()), amtCell, ...extraCols.map(fn=>fn(item))]);
+      else rows.push([numCell, xc('',xlDataStyle()), xc(name,xlDataStyle()), amtCell, ...extraCols.map(fn=>fn(item))]);
+      walk(item.id, depth+1);
+    });
+  }
+  walk(null, 0);
+  return rows;
+}
+
 function exportExcel(){
   const year=document.getElementById('yearSel').value, month=document.getElementById('monthSel').value;
   const wb=XLSX.utils.book_new();
   const co=getCarryover(), ti=totalIncome();
 
-  // Sheet 1: 수입
-  const flatI=flatArr(incomeItems,null,0);
+  // ── Sheet 1: 수입 ──────────────────────
+  const iHdr='065f46';
+  const iRows=buildItemRows(incomeItems, 3);
+  const iTotal=ti;
   const iData=[
-    [`${year}년 ${month}월 수입 내역`],[],
-    ['총 수입',ti],[],
-    ['번호','수입 목적','레벨','금액(원)','하위여부'],
-    ...flatI.map(({item,depth},i)=>{
-      const hasKids=incomeItems.some(c=>c.parentId===item.id);
-      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(incomeItems,item.id))}`:''];
-    }),
-    [],['','합계','',ti,''],
+    [xc(`${year}년 ${month}월 수입 내역`,xlTitle()),xc(''),xc(''),xc('')],
+    [xc(''),xc(''),xc(''),xc('')],
+    [xc('총 수입',xlSumLbl()),xc(''),xc(''),xc(iTotal,xlSumVal('059669'))],
+    [xc(''),xc(''),xc(''),xc('')],
+    [xc('#',xlHdrStyle(iHdr)),xc('항목',xlHdrStyle(iHdr)),xc('하위 항목',xlHdrStyle(iHdr)),xc('금액',xlHdrStyle(iHdr))],
+    ...iRows,
+    [xc('',xlDataStyle()),xc('합계',xlTotalStyle('059669')),xc('',xlTotalStyle('059669')),xc(iTotal,xlTotalStyle('059669'))],
   ];
   const ws0=XLSX.utils.aoa_to_sheet(iData);
-  ws0['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14},{wch:18}];
-  ws0['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}}];
+  ws0['!cols']=[{wch:5},{wch:22},{wch:22},{wch:16}];
+  ws0['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:2,c:0},e:{r:2,c:2}},{s:{r:iData.length-1,c:1},e:{r:iData.length-1,c:2}}];
+  ws0['!rows']=[{hpt:24},{hpt:6},{hpt:18},{hpt:6},{hpt:20}];
   XLSX.utils.book_append_sheet(wb,ws0,'수입');
 
-  // Sheet 2: 예산안
-  const flatB=flatArr(budgetItems,null,0);
+  // ── Sheet 2: 예산안 ────────────────────
+  const bHdr='1E40AF';
+  const bRows=buildItemRows(budgetItems, 3);
+  const bTotal=budgetTotal(), bAvail=ti+co;
   const bData=[
-    [`${year}년 ${month}월 예산안`],[],
-    ['총 수입',ti],['전월 이월',co],['사용 가능',ti+co],
-    ['총 예산 지출',budgetTotal()],['예산 잔액',ti+co-budgetTotal()],[],
-    ['번호','예산 목적','레벨','금액(원)','하위여부'],
-    ...flatB.map(({item,depth},i)=>{
-      const hasKids=budgetItems.some(c=>c.parentId===item.id);
-      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(budgetItems,item.id))}`:''];
-    }),
-    [],['','합계','',budgetTotal(),''],
+    [xc(`${year}년 ${month}월 예산안`,xlTitle()),xc(''),xc(''),xc('')],
+    [xc(''),xc(''),xc(''),xc('')],
+    [xc('총 수입',xlSumLbl()),xc(''),xc(''),xc(ti,xlSumVal('059669'))],
+    [xc('전월 이월',xlSumLbl()),xc(''),xc(''),xc(co,xlSumVal(co>=0?'1E40AF':'DC2626'))],
+    [xc('사용 가능',xlSumLbl()),xc(''),xc(''),xc(bAvail,xlSumVal('1E40AF'))],
+    [xc('예산 합계',xlSumLbl()),xc(''),xc(''),xc(bTotal,xlSumVal('DC2626'))],
+    [xc('예산 잔액',xlSumLbl()),xc(''),xc(''),xc(bAvail-bTotal,xlSumVal(bAvail-bTotal>=0?'1E40AF':'DC2626'))],
+    [xc(''),xc(''),xc(''),xc('')],
+    [xc('#',xlHdrStyle(bHdr)),xc('항목',xlHdrStyle(bHdr)),xc('하위 항목',xlHdrStyle(bHdr)),xc('예산 금액',xlHdrStyle(bHdr))],
+    ...bRows,
+    [xc('',xlDataStyle()),xc('합계',xlTotalStyle('1E40AF')),xc('',xlTotalStyle('1E40AF')),xc(bTotal,xlTotalStyle('1E40AF'))],
   ];
   const ws1=XLSX.utils.aoa_to_sheet(bData);
-  ws1['!cols']=[{wch:6},{wch:26},{wch:8},{wch:14},{wch:18}];
-  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}}];
+  ws1['!cols']=[{wch:5},{wch:22},{wch:22},{wch:16}];
+  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},...[2,3,4,5,6].map(r=>({s:{r,c:0},e:{r,c:2}})),{s:{r:bData.length-1,c:1},e:{r:bData.length-1,c:2}}];
+  ws1['!rows']=[{hpt:24},{hpt:6}];
   XLSX.utils.book_append_sheet(wb,ws1,'예산안');
 
-  // Sheet 3: 지출내역
+  // ── Sheet 3: 지출내역 ──────────────────
+  const eHdr='7C3AED';
   const tA=actualTotal(), tU=unexpTotal(), finalR=ti+co-tA-tU;
-  const rows=buildExpenseRows(null,0);
+  const expRows=buildExpenseRows(null,0);
+  let ecnt=0;
+  const eRows=expRows.map(({type,item,depth})=>{
+    ecnt++;
+    const isRoot=depth===0;
+    const name=('  '.repeat(Math.max(0,depth-1)))+item.purpose;
+    const numCell=xc(ecnt,xlDataStyle('center'));
+    if(type==='budget'){
+      const act=expenseAmounts[item.id]||0;
+      const rem=item.amount-act;
+      if(isRoot) return [numCell,xc(item.purpose,xlDataStyle()),xc('',xlDataStyle()),xc(item.amount,xlAmtStyle()),xc(act,xlAmtStyle(act>item.amount)),xc(rem,xlAmtStyle(rem<0))];
+      else return [numCell,xc('',xlDataStyle()),xc(name,xlDataStyle()),xc(item.amount,xlAmtStyle()),xc(act,xlAmtStyle(act>item.amount)),xc(rem,xlAmtStyle(rem<0))];
+    } else {
+      // 세부 내역 (unexp)
+      if(isRoot) return [numCell,xc(item.purpose,xlDataStyle()),xc('',xlDataStyle()),xc('',xlDataStyle()),xc(item.amount,xlAmtStyle()),xc('',xlDataStyle())];
+      else return [numCell,xc('',xlDataStyle()),xc(name,xlDataStyle()),xc('',xlDataStyle()),xc(item.amount,xlAmtStyle()),xc('',xlDataStyle())];
+    }
+  });
+  const tAU=tA+tU;
   const eData=[
-    [`${year}년 ${month}월 지출 내역`],[],
-    ['총 수입+이월',ti+co],['실제 지출',tA],['예상외 지출',tU],['최종 잔액',finalR],[],
-    ['번호','항목','레벨','예산','실제 지출','잔액'],
-    ...rows.map(({type,item,depth},i)=>{
-      if(type==='budget'){
-        const act=expenseAmounts[item.id]||0;
-        return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,act,item.amount-act];
-      } else {
-        return [i+1,' '.repeat(depth*2)+'[예상외]'+item.purpose,'—','—',item.amount,'—'];
-      }
-    }),
+    [xc(`${year}년 ${month}월 지출 내역`,xlTitle()),xc(''),xc(''),xc(''),xc(''),xc('')],
+    [xc(''),xc(''),xc(''),xc(''),xc(''),xc('')],
+    [xc('총 수입+이월',xlSumLbl()),xc(''),xc(''),xc(''),xc(''),xc(ti+co,xlSumVal('059669'))],
+    [xc('실제 지출',xlSumLbl()),xc(''),xc(''),xc(''),xc(''),xc(tAU,xlSumVal('DC2626'))],
+    [xc('최종 잔액',xlSumLbl()),xc(''),xc(''),xc(''),xc(''),xc(finalR,xlSumVal(finalR>=0?'1E40AF':'DC2626'))],
+    [xc(''),xc(''),xc(''),xc(''),xc(''),xc('')],
+    [xc('#',xlHdrStyle(eHdr)),xc('항목',xlHdrStyle(eHdr)),xc('하위 항목',xlHdrStyle(eHdr)),xc('예산',xlHdrStyle(eHdr)),xc('실제 지출',xlHdrStyle(eHdr)),xc('잔액',xlHdrStyle(eHdr))],
+    ...eRows,
+    [xc('',xlDataStyle()),xc('합계',xlTotalStyle('7C3AED')),xc('',xlTotalStyle('7C3AED')),xc(budgetTotal(),xlTotalStyle('7C3AED')),xc(tAU,xlTotalStyle('7C3AED')),xc(budgetTotal()-tAU,xlTotalStyle(budgetTotal()-tAU>=0?'7C3AED':'DC2626'))],
   ];
   const ws2=XLSX.utils.aoa_to_sheet(eData);
-  ws2['!cols']=[{wch:6},{wch:26},{wch:8},{wch:12},{wch:12},{wch:12}];
-  ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}];
+  ws2['!cols']=[{wch:5},{wch:20},{wch:20},{wch:14},{wch:14},{wch:14}];
+  ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}},...[2,3,4].map(r=>({s:{r,c:0},e:{r,c:4}})),{s:{r:eData.length-1,c:1},e:{r:eData.length-1,c:2}}];
+  ws2['!rows']=[{hpt:24},{hpt:6}];
   XLSX.utils.book_append_sheet(wb,ws2,'지출내역');
 
   const fn=`예산관리_${year}년_${month}월.xlsx`;
   XLSX.writeFile(wb,fn); toast(`"${fn}" 저장 완료`);
+}
+
+// ═══════════════════════════════════════
+//  EXCEL IMPORT
+// ═══════════════════════════════════════
+function importExcel(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const wsI=wb.Sheets['수입'], wsB=wb.Sheets['예산안'], wsE=wb.Sheets['지출내역'];
+      if(!wsI&&!wsB){toast('올바른 파일 형식이 아닙니다.');return;}
+      // 연월 추출
+      const titleWs=wsI||wsB;
+      const titleText=String(titleWs['A1']?.v||'');
+      const match=titleText.match(/(\d{4})년\s*(\d{1,2})월/);
+      if(!match){toast('파일에서 날짜를 찾을 수 없습니다.');return;}
+      const [,yr,mo]=match;
+      // 파싱
+      const newIncomeItems=wsI?parseXlItemSheet(wsI):[];
+      const newBudgetItems=wsB?parseXlItemSheet(wsB):[];
+      const {ea,ue}=wsE?parseXlExpenseSheet(wsE,newBudgetItems):{ea:{},ue:[]};
+      // 저장
+      localStorage.setItem(`budget_${yr}_${mo}`,JSON.stringify({incomeItems:newIncomeItems,budgetItems:newBudgetItems,expenseAmounts:ea,unexpectedExpenses:ue}));
+      document.getElementById('yearSel').value=yr;
+      document.getElementById('monthSel').value=parseInt(mo);
+      editId=null; unexpEditId=null; loadData();
+      toast(`${yr}년 ${mo}월 데이터를 불러왔습니다.`);
+    }catch(err){console.error(err);toast('파일 읽기 오류가 발생했습니다.');}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseXlItemSheet(ws){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let hdr=-1;
+  for(let r=0;r<rows.length;r++){if(rows[r].some(c=>String(c).trim()==='항목')){hdr=r;break;}}
+  if(hdr===-1) return [];
+  const items=[]; let lastRootId=null; let o0=0,o1=0;
+  const base=Date.now()+Math.floor(Math.random()*1e5);
+  for(let r=hdr+1;r<rows.length;r++){
+    const row=rows[r];
+    const c1=String(row[1]||'').trim(), c2=String(row[2]||'').trim();
+    if(c1==='합계'||c2==='합계') break;
+    if(!c1&&!c2) continue;
+    const rawAmt=row[3];
+    const amt=typeof rawAmt==='number'?rawAmt:(parseFloat(String(rawAmt||'').replace(/[^0-9.-]/g,''))||0);
+    const id=base+items.length+1;
+    if(c1){items.push({id,purpose:c1,amount:amt,parentId:null,order:o0++});lastRootId=id;o1=0;}
+    else if(c2){items.push({id,purpose:c2.replace(/^\s+/,''),amount:amt,parentId:lastRootId,order:o1++});}
+  }
+  return items;
+}
+
+function parseXlExpenseSheet(ws, budgetItems){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let hdr=-1;
+  for(let r=0;r<rows.length;r++){if(rows[r].some(c=>String(c).trim()==='항목')){hdr=r;break;}}
+  if(hdr===-1) return {ea:{},ue:[]};
+  // 예산 항목 이름 → id 맵
+  const bMap=new Map(); budgetItems.forEach(i=>bMap.set(String(i.purpose).trim().toLowerCase(),i.id));
+  const ea={},ue=[]; let lastRootBid=null; let ueOrd=0;
+  const base=Date.now()+Math.floor(Math.random()*1e5)+500;
+  for(let r=hdr+1;r<rows.length;r++){
+    const row=rows[r];
+    const c1=String(row[1]||'').trim(), c2=String(row[2]||'').trim();
+    if(c1==='합계'||c2==='합계') break;
+    if(!c1&&!c2) continue;
+    const budget=row[3], actual=row[4];
+    const hasBgt=typeof budget==='number'&&budget>0;
+    const actualAmt=typeof actual==='number'?actual:(parseFloat(String(actual||'').replace(/[^0-9.-]/g,''))||0);
+    if(c1){
+      if(hasBgt){const bid=bMap.get(c1.toLowerCase());if(bid!=null){ea[bid]=actualAmt;lastRootBid=bid;}}
+      else{const id=base+ue.length+1;ue.push({id,purpose:c1,amount:actualAmt,parentId:null,order:ueOrd++});lastRootBid=null;}
+    }else if(c2){
+      const pname=c2.replace(/^\s+/,'');
+      if(hasBgt){const bid=bMap.get(pname.toLowerCase());if(bid!=null)ea[bid]=actualAmt;}
+      else{const id=base+ue.length+1;ue.push({id,purpose:pname,amount:actualAmt,parentId:lastRootBid,order:ueOrd++});}
+    }
+  }
+  return {ea,ue};
 }
 
 // ═══════════════════════════════════════
