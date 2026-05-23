@@ -779,7 +779,6 @@ function renderList(){
 
 // ── 공통 트리 렌더러 ──
 function makeTreeRenderer(arr, total, type, amtPrefix, amtClass){
-  let cnt=0;
   const isIA=type==='income', isBF=type==='budget';
   const editCls=isIA?'':isBF?' bf':' ep';
   const okCls=isIA?'':isBF?' bf':' ep';
@@ -789,9 +788,8 @@ function makeTreeRenderer(arr, total, type, amtPrefix, amtClass){
   const bsrLblCls=isIA?' ia':'';
   const bsrValCls=isIA?' ia':'';
 
-  function renderItem(item, depth){
-    cnt++;
-    const myNum=cnt;
+  function renderItem(item, depth, sibIdx){
+    const myNum=sibIdx+1;
     const children=arr.filter(i=>i.parentId===item.id).sort((a,b)=>a.order-b.order);
     const hasKids=children.length>0;
     const pct=total>0?((item.amount/total)*100).toFixed(1):'0.0';
@@ -828,7 +826,7 @@ function makeTreeRenderer(arr, total, type, amtPrefix, amtClass){
     if(hasKids){
       const ci=(depth+1)*24+4;
       html+=`<div class="bracket-group">`;
-      children.forEach(c=>{ html+=renderItem(c,depth+1); });
+      children.forEach((c,i)=>{ html+=renderItem(c,depth+1,i); });
       html+=`<div class="bracket-sum-row${bsrCls}" style="padding-left:${ci}px">
         <span class="bsr-label${bsrLblCls}">하위 합계</span>
         <span class="bsr-val${bsrValCls}">${amtPrefix}${fw(childrenAmtSum(arr,item.id))}</span>
@@ -844,7 +842,7 @@ function renderIncomeList(){
   const roots=incomeItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
   if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 수입 항목이 없습니다.');return;}
   const renderItem=makeTreeRenderer(incomeItems,totalIncome(),'income','+','.ia');
-  list.innerHTML=roots.map(r=>renderItem(r,0)).join('');
+  list.innerHTML=roots.map((r,i)=>renderItem(r,0,i)).join('');
 }
 
 function renderBudgetList(){
@@ -852,7 +850,7 @@ function renderBudgetList(){
   const roots=budgetItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
   if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 예산 항목이 없습니다.');return;}
   const renderItem=makeTreeRenderer(budgetItems,budgetTotal(),'budget','-','');
-  list.innerHTML=roots.map(r=>renderItem(r,0)).join('');
+  list.innerHTML=roots.map((r,i)=>renderItem(r,0,i)).join('');
 }
 
 function flatArr(arr,parentId,depth){
@@ -892,7 +890,7 @@ function renderExpenseList(){
         <span style="text-align:right">실제 지출</span>
         <span style="text-align:right">잔액</span>
       </div>
-      ${rows.map((r,i)=>renderExpRow(r,i+1)).join('')}
+      ${rows.map(r=>renderExpRow(r)).join('')}
       <div class="exp-total-row">
         <div class="exp-total-lbl">합계</div>
         <div class="exp-tbamt" id="etB">${fw(tB)}</div>
@@ -909,23 +907,24 @@ function renderExpenseList(){
 
 function buildExpenseRows(parentId,depth){
   const result=[];
-  budgetItems.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order).forEach(item=>{
-    result.push({type:'budget',item,depth});
-    unexpectedExpenses.filter(u=>u.parentId===item.id).sort((a,b)=>a.order-b.order).forEach(u=>{
-      result.push({type:'unexp',item:u,depth:depth+1});
+  budgetItems.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order).forEach((item,bi)=>{
+    result.push({type:'budget',item,depth,sibIdx:bi});
+    unexpectedExpenses.filter(u=>u.parentId===item.id).sort((a,b)=>a.order-b.order).forEach((u,ui)=>{
+      result.push({type:'unexp',item:u,depth:depth+1,sibIdx:ui});
     });
     result.push(...buildExpenseRows(item.id,depth+1));
   });
   if(parentId===null){
-    unexpectedExpenses.filter(u=>u.parentId===null).sort((a,b)=>a.order-b.order).forEach(u=>{
-      result.push({type:'unexp',item:u,depth:0});
+    unexpectedExpenses.filter(u=>u.parentId===null).sort((a,b)=>a.order-b.order).forEach((u,ui)=>{
+      result.push({type:'unexp',item:u,depth:0,sibIdx:ui});
     });
   }
   return result;
 }
 
-function renderExpRow({type,item,depth},idx){
+function renderExpRow({type,item,depth,sibIdx}){
   const indent=depth*22;
+  const num=sibIdx+1;
   if(type==='budget'){
     const hasKids=budgetItems.some(i=>i.parentId===item.id)||unexpectedExpenses.some(u=>u.parentId===item.id);
     const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
@@ -937,7 +936,7 @@ function renderExpRow({type,item,depth},idx){
       ondragstart="onDragStart(event,${item.id},'budget')" ondragend="onDragEnd(event)"
       ondragover="onDragOver(event,${item.id},'budget')" ondragleave="clearDrop()"
       ondrop="onDrop(event,${item.id},'budget')">
-      <div class="item-num">${idx}</div>
+      <div class="item-num">${num}</div>
       <div class="exp-name" style="${hasKids?'font-weight:700;':''}">${esc(item.purpose)}</div>
       <div class="exp-bamt">${fw(item.amount)}</div>
       ${expCell}
@@ -959,7 +958,7 @@ function renderExpRow({type,item,depth},idx){
       ondragstart="onDragStart(event,${item.id},'unexp')" ondragend="onDragEnd(event)"
       ondragover="onDragOver(event,${item.id},'unexp')" ondragleave="clearDrop()"
       ondrop="onDrop(event,${item.id},'unexp')">
-      <div class="item-num unexp">${idx}</div>
+      <div class="item-num unexp">${num}</div>
       <div class="exp-name">${esc(item.purpose)}</div>
       <div class="exp-bamt" style="color:#cbd5e1">—</div>
       ${expCell}
