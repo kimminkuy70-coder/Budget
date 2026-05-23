@@ -185,6 +185,18 @@
     .toast { position:fixed; bottom:24px; right:24px; background:#1e293b; color:white; padding:11px 18px; border-radius:10px; font-size:.85rem; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.18); transform:translateY(60px); opacity:0; transition:transform .25s,opacity .25s; z-index:1000; }
     .toast.show { transform:translateY(0); opacity:1; }
 
+    /* bracket visualization (budget mode children group) */
+    .bracket-group { position:relative; }
+    .tree-item.has-kids { background:#eff6ff; }
+    .tree-item.has-kids:hover { background:#dbeafe; }
+    .bracket-sum-row {
+      display:flex; justify-content:flex-end; align-items:center; gap:6px;
+      padding:3px 12px 6px; font-size:.73rem;
+      border-top:1.5px dashed #93c5fd; margin:0 4px 6px;
+    }
+    .bsr-label { color:#93c5fd; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+    .bsr-val { font-weight:700; color:#1e40af; font-size:.8rem; }
+
     @media(max-width:860px){
       .app-layout{flex-direction:column;padding:16px;}
       .left-panel{width:100%;}
@@ -307,20 +319,13 @@ let dndIsBudget = true;
 // ═══════════════════════════════════════
 //  COMPUTED
 // ═══════════════════════════════════════
-// 하위 항목이 있는 경우 자신의 amount 대신 하위 합산을 반환
-function isLeaf(id){ return !budgetItems.some(i=>i.parentId===id); }
-function getComputedAmount(id){
-  if(isLeaf(id)) return budgetItems.find(i=>i.id===id)?.amount||0;
-  return budgetItems.filter(i=>i.parentId===id).reduce((s,c)=>s+getComputedAmount(c.id),0);
-}
-function getActualForItem(id){
-  if(isLeaf(id)) return expenseAmounts[id]||0;
-  return budgetItems.filter(i=>i.parentId===id).reduce((s,c)=>s+getActualForItem(c.id),0);
-}
-// 루트 항목들의 합산 (= 전체 리프 합산과 동일)
-const budgetTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+getComputedAmount(i.id),0);
-const actualTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+getActualForItem(i.id),0);
+// 예산 합계: 최상위 항목들의 자체 금액 합산 (이중계산 없음)
+const budgetTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
+// 실제 지출 합계: 최상위 항목들의 실제 지출 합산
+const actualTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+(expenseAmounts[i.id]||0),0);
 const unexpTotal  = () => unexpectedExpenses.reduce((s,i)=>s+i.amount,0);
+// 직계 하위 항목 금액 합산 (bracket 표시용)
+function childrenAmtSum(pid){ return budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+c.amount,0); }
 
 function getCarryover() {
   const y = +document.getElementById('yearSel').value;
@@ -331,10 +336,7 @@ function getCarryover() {
   try {
     const d = JSON.parse(raw);
     const bi = d.budgetItems||[], ea = d.expenseAmounts||{}, ue = d.unexpectedExpenses||[];
-    // 전월도 동일한 리프 기반 계산 적용
-    function pLeaf(id){ return !bi.some(i=>i.parentId===id); }
-    function pActual(id){ return pLeaf(id)?(ea[id]||0):bi.filter(i=>i.parentId===id).reduce((s,c)=>s+pActual(c.id),0); }
-    const act   = bi.filter(i=>i.parentId===null).reduce((s,i)=>s+pActual(i.id),0);
+    const act   = bi.filter(i=>i.parentId===null).reduce((s,i)=>s+(ea[i.id]||0),0);
     const unexp = ue.reduce((s,i)=>s+i.amount,0);
     return (d.salary||0) - act - unexp;
   } catch { return 0; }
@@ -465,18 +467,12 @@ function startEdit(id, isBudget){ editId=id; editType=isBudget?'budget':'unexp';
 
 function saveEdit(id){
   const p=document.getElementById(`ep-${id}`).value.trim();
+  const a=parseFloat(document.getElementById(`ea-${id}`).value);
   if(!p){toast('목적을 입력해주세요.');return;}
+  if(isNaN(a)||a<=0){toast('올바른 금액을 입력해주세요.');return;}
   const arr = editType==='budget' ? budgetItems : unexpectedExpenses;
   const item = arr.find(i=>i.id===id);
-  if(!item) return;
-  item.purpose=p;
-  // 리프 항목 또는 예상외 항목만 금액 수정 가능 (상위는 하위 합산이므로 수정 불필요)
-  const amtEl=document.getElementById(`ea-${id}`);
-  if(amtEl){
-    const a=parseFloat(amtEl.value);
-    if(isNaN(a)||a<=0){toast('올바른 금액을 입력해주세요.');return;}
-    item.amount=a;
-  }
+  if(item){item.purpose=p; item.amount=a;}
   editId=null; renderAll(); toast('수정되었습니다.');
 }
 function cancelEdit(){ editId=null; renderList(); }
@@ -484,25 +480,26 @@ function cancelEdit(){ editId=null; renderList(); }
 // ═══════════════════════════════════════
 //  EXPENSE INPUT (partial update)
 // ═══════════════════════════════════════
+function updateExpRemain(id){
+  const item=budgetItems.find(i=>i.id===id); if(!item) return;
+  const r=item.amount-(expenseAmounts[id]||0);
+  const el=document.getElementById(`er-${id}`);
+  if(el){el.textContent=fw(r); el.className='exp-remain'+(r<0?' neg':'');}
+}
+
 function updateExpense(id, val){
   const v=parseFloat(val); expenseAmounts[id]=(isNaN(v)||v<0)?0:v;
-  // 리프 항목의 잔액 셀 업데이트
+  updateExpRemain(id);
+  // 상위 항목 실제 지출을 하위 합산으로 자동 업데이트
   const item=budgetItems.find(i=>i.id===id);
   if(item){
-    const computed=getComputedAmount(id);
-    const r=computed-expenseAmounts[id];
-    const el=document.getElementById(`er-${id}`);
-    if(el){el.textContent=fw(r); el.className='exp-remain'+(r<0?' neg':'');}
-    // 상위 항목들도 집계 업데이트
     let pid=item.parentId;
-    while(pid!==null){
-      const par=budgetItems.find(i=>i.id===pid);
-      if(!par)break;
-      const pAmt=getComputedAmount(pid), pAct=getActualForItem(pid), pRem=pAmt-pAct;
-      const actEl=document.getElementById(`ea-agg-${pid}`);
-      const remEl=document.getElementById(`er-${pid}`);
-      if(actEl){actEl.textContent=fw(pAct);}
-      if(remEl){remEl.textContent=fw(pRem); remEl.className='exp-remain'+(pRem<0?' neg':'');}
+    while(pid!==null&&pid!==undefined){
+      const par=budgetItems.find(i=>i.id===pid); if(!par) break;
+      expenseAmounts[pid]=budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
+      const inp=document.getElementById(`exp-inp-${pid}`);
+      if(inp) inp.value=expenseAmounts[pid]||'';
+      updateExpRemain(pid);
       pid=par.parentId;
     }
   }
@@ -510,12 +507,16 @@ function updateExpense(id, val){
 }
 
 function refreshExpTotals(){
-  const co=getCarryover();
-  const tB=budgetTotal(), tA=actualTotal(), tU=unexpTotal();
-  const tAU=tA+tU, finalR=salary+co-tAU;
+  const co=getCarryover(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU;
+  const finalR=salary+co-tAU;
+  const tB=budgetTotal();
   const elA=document.getElementById('etA'), elF=document.getElementById('efA');
-  if(elA){elA.textContent=fw(tAU);}
+  if(elA) elA.textContent=fw(tAU);
   if(elF){elF.textContent=fw(finalR); elF.className='exp-final-amt'+(finalR<0?' neg':'');}
+  // 합계행 예산/잔액
+  const elTB=document.getElementById('etB'), elTR=document.getElementById('etR');
+  if(elTB) elTB.textContent=fw(tB);
+  if(elTR){elTR.textContent=fw(tB-tAU); elTR.className='exp-trem'+(tB-tAU<0?' neg':'');}
 }
 
 // ═══════════════════════════════════════
@@ -652,7 +653,6 @@ function renderSummary(){
       {l:co!==0?'월급+이월':'월급', v:avail,  c:'c-blue'},
       {l:'예산 지출',               v:used,   c:'c-red'},
       {l:'잔액',                    v:remain, c:remain<0?'c-red':'c-green'},
-      {l:'예산 비율', v:avail>0?(used/avail*100).toFixed(1)+'%':'0%', c:'c-blue', isText:true},
     ];
   } else {
     const tA=actualTotal(), tU=unexpTotal(), total=tA+tU;
@@ -666,7 +666,9 @@ function renderSummary(){
     ];
   }
 
-  document.getElementById('sumGrid').innerHTML=items.map(it=>`
+  const grid=document.getElementById('sumGrid');
+  grid.style.gridTemplateColumns=ib?'repeat(3,1fr)':'repeat(2,1fr)';
+  grid.innerHTML=items.map(it=>`
     <div class="sum-item"><div class="sl">${it.l}</div><div class="sv ${it.c}">${fw(it.v)}</div></div>`).join('');
 
   const fill=document.getElementById('progFill');
@@ -683,59 +685,78 @@ function renderList(){
   else               renderExpenseList();
 }
 
-// ── budget mode list (tree with DnD) ──
+// ── budget mode list (tree with DnD + bracket) ──
 function renderBudgetList(){
   const list=document.getElementById('itemList');
-  const flat=flatBudget(null,0);
-  if(flat.length===0){
-    list.innerHTML=emptyHtml('아직 추가된 예산 항목이 없습니다.'); return;
-  }
+  const roots=budgetItems.filter(i=>i.parentId===null).sort((a,b)=>a.order-b.order);
+  if(roots.length===0){list.innerHTML=emptyHtml('아직 추가된 예산 항목이 없습니다.');return;}
   const total=budgetTotal();
-  list.innerHTML=flat.map(({item,depth},idx)=>{
-    const leaf=isLeaf(item.id);
-    const dispAmt=getComputedAmount(item.id); // 리프: 자신 금액, 상위: 하위 합산
-    const pct=total>0?((dispAmt/total)*100).toFixed(1):'0.0';
+  let cnt=0;
+  function renderItem(item,depth){
+    cnt++;
+    const myNum=cnt;
+    const children=budgetItems.filter(i=>i.parentId===item.id).sort((a,b)=>a.order-b.order);
+    const hasKids=children.length>0;
+    const pct=total>0?((item.amount/total)*100).toFixed(1):'0.0';
     const indent=depth*24;
+    let html='';
     if(item.id===editId){
-      return `<div class="tree-item editing" style="padding-left:${indent+12}px">
+      html+=`<div class="tree-item editing" style="padding-left:${indent+12}px">
         <div class="edit-form">
           <input class="ei ei-p" id="ep-${item.id}" value="${esc(item.purpose)}"
             onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
-          ${leaf
-            ? `<input class="ei ei-a" id="ea-${item.id}" type="number" value="${item.amount}"
-                onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>`
-            : `<div style="font-size:.74rem;color:#64748b;padding:0 8px;white-space:nowrap;">합산: ${fw(dispAmt)}</div>`
-          }
+          <input class="ei ei-a" id="ea-${item.id}" type="number" value="${item.amount}"
+            onkeydown="if(event.key==='Enter')saveEdit(${item.id});if(event.key==='Escape')cancelEdit()"/>
           <button class="btn-ok" onclick="saveEdit(${item.id})">저장</button>
           <button class="btn-cx" onclick="cancelEdit()">취소</button>
         </div>
       </div>`;
+    } else {
+      html+=`<div class="tree-item${hasKids?' has-kids':''}" style="padding-left:${indent+4}px"
+        id="ti-${item.id}" draggable="true"
+        ondragstart="onDragStart(event,${item.id},true)" ondragend="onDragEnd(event)"
+        ondragover="onDragOver(event,${item.id},true)" ondragleave="clearDrop()"
+        ondrop="onDrop(event,${item.id},true)">
+        <div class="drag-handle">${dragIcon()}</div>
+        <div class="item-num">${myNum}</div>
+        <div class="item-purpose" title="${esc(item.purpose)}">${esc(item.purpose)}</div>
+        <div class="item-pct">${pct}%</div>
+        <div class="item-amt">-${fw(item.amount)}</div>
+        <div style="display:flex;gap:3px;flex-shrink:0">
+          <button class="btn-ico edit" onclick="startEdit(${item.id},true)">${editIcon()}</button>
+          <button class="btn-ico del"  onclick="deleteItem(${item.id},true)">${delIcon()}</button>
+        </div>
+      </div>`;
     }
-    const amtStyle=leaf?'':'color:#64748b;font-style:italic;';
-    const amtLabel=leaf?`-${fw(dispAmt)}`:`합=${fw(dispAmt)}`;
-    return `<div class="tree-item" style="padding-left:${indent+4}px"
-      id="ti-${item.id}" draggable="true"
-      ondragstart="onDragStart(event,${item.id},true)"
-      ondragend="onDragEnd(event)"
-      ondragover="onDragOver(event,${item.id},true)"
-      ondragleave="clearDrop()"
-      ondrop="onDrop(event,${item.id},true)">
-      <div class="drag-handle">${dragIcon()}</div>
-      <div class="item-num">${idx+1}</div>
-      <div class="item-purpose" title="${esc(item.purpose)}" style="${!leaf?'font-weight:700;':''}">${esc(item.purpose)}</div>
-      <div class="item-pct">${pct}%</div>
-      <div class="item-amt" style="${amtStyle}">${amtLabel}</div>
-      <div style="display:flex;gap:3px;flex-shrink:0">
-        <button class="btn-ico edit" onclick="startEdit(${item.id},true)" title="수정">${editIcon()}</button>
-        <button class="btn-ico del"  onclick="deleteItem(${item.id},true)" title="삭제">${delIcon()}</button>
-      </div>
-    </div>`;
-  }).join('');
+    if(hasKids){
+      const childIndent=(depth+1)*24+4;
+      html+=`<div class="bracket-group" style="--bi:${childIndent}px">`;
+      children.forEach(c=>{ html+=renderItem(c,depth+1); });
+      html+=`<div class="bracket-sum-row" style="padding-left:${childIndent}px">
+        <span class="bsr-label">하위 합계</span>
+        <span class="bsr-val">${fw(childrenAmtSum(item.id))}</span>
+      </div></div>`;
+    }
+    return html;
+  }
+  list.innerHTML=roots.map(r=>renderItem(r,0)).join('');
 }
 
 function flatBudget(parentId, depth){
   return budgetItems.filter(i=>i.parentId===parentId).sort((a,b)=>a.order-b.order)
     .flatMap(item=>[{item,depth},...flatBudget(item.id,depth+1)]);
+}
+
+// 하위가 있는 항목의 실제지출 초기값: 하위 합산 (미설정 시만)
+function initParentExpenses(){
+  // 깊이 역순(깊은 것 먼저) 처리
+  function depth(id,d=0){ const it=budgetItems.find(i=>i.id===id); return it?.parentId?depth(it.parentId,d+1):d; }
+  budgetItems.filter(item=>budgetItems.some(i=>i.parentId===item.id))
+    .sort((a,b)=>depth(b.id)-depth(a.id))
+    .forEach(item=>{
+      if(expenseAmounts[item.id]===undefined)
+        expenseAmounts[item.id]=budgetItems.filter(i=>i.parentId===item.id).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
+    });
 }
 
 // ── expense mode list (table) ──
@@ -744,6 +765,7 @@ function renderExpenseList(){
   if(budgetItems.length===0&&unexpectedExpenses.length===0){
     list.innerHTML=emptyHtml('예산안 모드에서 예산 항목을 추가하거나,<br>예상치 못한 지출을 추가해주세요.'); return;
   }
+  initParentExpenses();
 
   const co=getCarryover(), tB=budgetTotal(), tA=actualTotal(), tU=unexpTotal(), tAU=tA+tU;
   const finalR=salary+co-tAU;
@@ -762,9 +784,9 @@ function renderExpenseList(){
       ${rows.map((r,i)=>renderExpRow(r,i+1)).join('')}
       <div class="exp-total-row">
         <div class="exp-total-lbl">합계</div>
-        <div class="exp-tbamt">${fw(tB)}</div>
+        <div class="exp-tbamt" id="etB">${fw(tB)}</div>
         <div class="exp-tact" id="etA">${fw(tAU)}</div>
-        <div class="exp-trem ${tB-tAU<0?'neg':''}">${fw(tB-tAU)}</div>
+        <div class="exp-trem ${tB-tAU<0?'neg':''}" id="etR">${fw(tB-tAU)}</div>
       </div>
     </div>
     ${co!==0?`<div class="exp-co-row"><span class="exp-co-lbl">전월 이월 포함</span><span class="exp-co-amt" id="eCo">${fw(co)}</span></div>`:''}
@@ -801,27 +823,20 @@ function renderExpRow({type,item,depth,draggable}, idx){
   const isBudget=type==='budget';
 
   if(isBudget){
-    const leaf=isLeaf(item.id);
-    const computedAmt=getComputedAmount(item.id);
-    if(!leaf){
-      // 상위 항목: 하위 합산 집계 표시 (입력 없음)
-      const aggActual=getActualForItem(item.id);
-      const aggRemain=computedAmt-aggActual;
-      return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;background:#f1f5f9;">
-        <div class="item-num">${idx}</div>
-        <div class="exp-name" style="font-weight:700">${esc(item.purpose)}</div>
-        <div class="exp-bamt">${fw(computedAmt)}</div>
-        <div class="exp-bamt" id="ea-agg-${item.id}" style="color:#ef4444">${fw(aggActual)}</div>
-        <div class="exp-remain${aggRemain<0?' neg':''}" id="er-${item.id}">${fw(aggRemain)}</div>
-      </div>`;
-    }
+    const hasKids=budgetItems.some(i=>i.parentId===item.id);
     const actual=expenseAmounts[item.id]||0;
-    const remain=computedAmt-actual;
-    return `<div class="exp-row exp-item" style="padding-left:${indent+2}px">
-      <div class="expense-num item-num">${idx}</div>
-      <div class="exp-name">${esc(item.purpose)}</div>
-      <div class="exp-bamt">${fw(computedAmt)}</div>
-      <input class="exp-input" type="number" value="${actual||''}" placeholder="0" min="0" step="1000"
+    const remain=item.amount-actual;
+    const rowBg=hasKids?'background:#f8fafc;':'';
+    const nameBold=hasKids?'font-weight:700;':'';
+    const dndAttrs=`draggable="true"
+      ondragstart="onDragStart(event,${item.id},true)" ondragend="onDragEnd(event)"
+      ondragover="onDragOver(event,${item.id},true)" ondragleave="clearDrop()"
+      ondrop="onDrop(event,${item.id},true)"`;
+    return `<div class="exp-row exp-item" style="padding-left:${indent+2}px;${rowBg}" ${dndAttrs}>
+      <div class="item-num">${idx}</div>
+      <div class="exp-name" style="${nameBold}">${esc(item.purpose)}</div>
+      <div class="exp-bamt">${fw(item.amount)}</div>
+      <input class="exp-input" type="number" id="exp-inp-${item.id}" value="${actual||''}" placeholder="0" min="0" step="1000"
         oninput="updateExpense(${item.id},this.value)"/>
       <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
     </div>`;
@@ -859,10 +874,10 @@ function exportExcel(){
     [`${year}년 ${month}월 예산안`],[],
     ['월급',salary],['이월',co],['사용 가능',salary+co],
     ['총 예산 지출',budgetTotal()],['예산 잔액',salary+co-budgetTotal()],[],
-    ['번호','예산 목적','레벨','금액(원)','비고'],
+    ['번호','예산 목적','레벨','금액(원)','하위여부'],
     ...flat.map(({item,depth},i)=>{
-      const leaf=isLeaf(item.id), disp=getComputedAmount(item.id);
-      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',disp,leaf?'':'하위합산'];
+      const hasKids=budgetItems.some(c=>c.parentId===item.id);
+      return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,hasKids?`하위합계:${fw(childrenAmtSum(item.id))}`:''];
     }),
     [],['','합계','',budgetTotal(),''],
   ];
@@ -880,9 +895,8 @@ function exportExcel(){
     ['번호','항목','레벨','예산','실제 지출','잔액'],
     ...rows.map(({type,item,depth},i)=>{
       if(type==='budget'){
-        const leaf=isLeaf(item.id), disp=getComputedAmount(item.id);
-        const act=leaf?(expenseAmounts[item.id]||0):getActualForItem(item.id);
-        return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',disp,act,disp-act];
+        const act=expenseAmounts[item.id]||0;
+        return [i+1,' '.repeat(depth*2)+item.purpose,depth+1+'단계',item.amount,act,item.amount-act];
       } else {
         return [i+1,' '.repeat(depth*2)+'[예상외]'+item.purpose,'—','—',item.amount,'—'];
       }
