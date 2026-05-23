@@ -330,6 +330,7 @@ let editId   = null;
 let editType = null; // 'income' | 'budget' | 'unexp'
 let dndId    = null;
 let dndType  = null; // 'income' | 'budget' | 'unexp'
+let unexpEditId = null; // 지출 모드에서 편집 중인 세부 내역 항목 id
 
 // ═══════════════════════════════════════
 //  COMPUTED
@@ -337,10 +338,17 @@ let dndType  = null; // 'income' | 'budget' | 'unexp'
 const totalIncome = () => incomeItems.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
 const budgetTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
 const actualTotal = () => budgetItems.filter(i=>i.parentId===null).reduce((s,i)=>s+(expenseAmounts[i.id]||0),0);
-const unexpTotal  = () => unexpectedExpenses.reduce((s,i)=>s+i.amount,0);
+// 루트 레벨 세부 내역만 합산 (예산 상위항목에 속한 것은 해당 항목 expenseAmounts에 포함)
+const unexpTotal  = () => unexpectedExpenses.filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
 
 function childrenAmtSum(arr, pid){
   return arr.filter(i=>i.parentId===pid).reduce((s,c)=>s+c.amount,0);
+}
+
+// 예산 상위항목의 실제지출 = 하위 예산항목 지출 합 + 하위 세부내역 항목 금액 합
+function computeParentExpense(pid){
+  return budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0)
+       + unexpectedExpenses.filter(u=>u.parentId===pid).reduce((s,u)=>s+u.amount,0);
 }
 
 function getCarryover(){
@@ -509,7 +517,7 @@ function updateExpense(id,val){
     let pid=item.parentId;
     while(pid!==null&&pid!==undefined){
       const par=budgetItems.find(i=>i.id===pid); if(!par) break;
-      expenseAmounts[pid]=budgetItems.filter(i=>i.parentId===pid).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
+      expenseAmounts[pid]=computeParentExpense(pid);
       const inp=document.getElementById(`exp-inp-${pid}`);
       if(inp){ if(inp.tagName==='INPUT') inp.value=expenseAmounts[pid]||''; else inp.textContent=fw(expenseAmounts[pid]||0); }
       updateExpRemain(pid);
@@ -572,7 +580,9 @@ function onDrop(e,targetId,targetType){
   e.preventDefault(); clearDrop();
   if(!dndId||dndId===targetId) return;
   const rect=e.currentTarget.getBoundingClientRect(), pct=(e.clientY-rect.top)/rect.height;
-  const pos=pct<0.28?'before':pct>0.72?'after':'on';
+  let pos=pct<0.28?'before':pct>0.72?'after':'on';
+  // 세부 내역 항목은 자식을 가질 수 없으므로 drop-on 불가 → after로 전환
+  if(pos==='on' && targetType==='unexp') pos='after';
   performMove(dndId,dndType,targetId,targetType,pos);
   dndId=null; dndType=null; renderAll();
 }
@@ -787,10 +797,13 @@ function flatArr(arr,parentId,depth){
 // ═══════════════════════════════════════
 function initParentExpenses(){
   function depth(id,d=0){ const it=budgetItems.find(i=>i.id===id); return it?.parentId?depth(it.parentId,d+1):d; }
-  budgetItems.filter(item=>budgetItems.some(i=>i.parentId===item.id))
+  // 예산 하위 또는 세부 내역 하위가 있는 항목 모두 처리
+  budgetItems.filter(item=>
+    budgetItems.some(i=>i.parentId===item.id) || unexpectedExpenses.some(u=>u.parentId===item.id)
+  )
     .sort((a,b)=>depth(b.id)-depth(a.id))
     .forEach(item=>{
-      expenseAmounts[item.id]=budgetItems.filter(i=>i.parentId===item.id).reduce((s,c)=>s+(expenseAmounts[c.id]||0),0);
+      expenseAmounts[item.id]=computeParentExpense(item.id);
     });
 }
 
@@ -846,7 +859,7 @@ function buildExpenseRows(parentId,depth){
 function renderExpRow({type,item,depth},idx){
   const indent=depth*22;
   if(type==='budget'){
-    const hasKids=budgetItems.some(i=>i.parentId===item.id);
+    const hasKids=budgetItems.some(i=>i.parentId===item.id)||unexpectedExpenses.some(u=>u.parentId===item.id);
     const actual=expenseAmounts[item.id]||0, remain=item.amount-actual;
     const expCell=hasKids
       ? `<div class="exp-input" id="exp-inp-${item.id}" style="display:flex;align-items:center;justify-content:flex-end;font-size:.85rem;font-weight:700;color:#ef4444;background:#f1f5f9;border-color:#e2e8f0;cursor:default;">${fw(actual)}</div>`
@@ -863,6 +876,16 @@ function renderExpRow({type,item,depth},idx){
       <div class="exp-remain${remain<0?' neg':''}" id="er-${item.id}">${fw(remain)}</div>
     </div>`;
   } else {
+    const isEditing = item.id === unexpEditId;
+    const expCell = isEditing
+      ? `<input class="exp-input" type="number" id="unexp-inp-${item.id}" value="${item.amount||''}" placeholder="0" min="0" step="1000"
+          style="border-color:#ddd6fe;" onkeydown="if(event.key==='Enter')saveUnexp(${item.id});else if(event.key==='Escape'){unexpEditId=null;renderList();}"/>`
+      : `<div class="exp-bamt" style="color:#9333ea;text-align:right">${fw(item.amount)}</div>`;
+    const btnCell = isEditing
+      ? `<button class="btn-ico edit" onclick="saveUnexp(${item.id})" title="확인">${checkIcon()}</button>
+         <button class="btn-ico del" onclick="deleteItem(${item.id},'unexp')">${delIcon()}</button>`
+      : `<button class="btn-ico edit" onclick="startUnexpEdit(${item.id})" title="수정">${editIcon()}</button>
+         <button class="btn-ico del" onclick="deleteItem(${item.id},'unexp')">${delIcon()}</button>`;
     return `<div class="exp-row exp-item unexp-row" style="padding-left:${indent+2}px"
       draggable="true"
       ondragstart="onDragStart(event,${item.id},'unexp')" ondragend="onDragEnd(event)"
@@ -871,14 +894,15 @@ function renderExpRow({type,item,depth},idx){
       <div class="item-num unexp">${idx}</div>
       <div class="exp-name">${esc(item.purpose)}</div>
       <div class="exp-bamt" style="color:#cbd5e1">—</div>
-      <input class="exp-input" type="number" id="unexp-inp-${item.id}" value="${item.amount||''}" placeholder="0" min="0" step="1000"
-        style="border-color:#ddd6fe;" onkeydown="if(event.key==='Enter')saveUnexp(${item.id})"/>
-      <div style="display:flex;gap:3px;justify-content:flex-end">
-        <button class="btn-ico edit" onclick="saveUnexp(${item.id})" title="확인">${checkIcon()}</button>
-        <button class="btn-ico del" onclick="deleteItem(${item.id},'unexp')">${delIcon()}</button>
-      </div>
+      ${expCell}
+      <div style="display:flex;gap:3px;justify-content:flex-end">${btnCell}</div>
     </div>`;
   }
+}
+
+function startUnexpEdit(id){
+  unexpEditId=id; renderList();
+  requestAnimationFrame(()=>document.getElementById(`unexp-inp-${id}`)?.focus());
 }
 
 function saveUnexp(id){
@@ -886,8 +910,18 @@ function saveUnexp(id){
   const v=parseFloat(inp.value);
   if(isNaN(v)||v<=0){toast('올바른 금액을 입력해주세요.');return;}
   const item=unexpectedExpenses.find(i=>i.id===id);
-  if(item) item.amount=v;
-  refreshExpTotals(); renderSummary(); toast('수정되었습니다.');
+  if(item){
+    item.amount=v;
+    // 상위 예산 항목 실제 지출 재계산
+    let pid=item.parentId;
+    while(pid!==null&&pid!==undefined){
+      const par=budgetItems.find(i=>i.id===pid); if(!par) break;
+      expenseAmounts[pid]=computeParentExpense(pid);
+      pid=par.parentId;
+    }
+  }
+  unexpEditId=null;
+  renderAll(); toast('수정되었습니다.');
 }
 
 // ═══════════════════════════════════════
