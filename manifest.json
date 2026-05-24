@@ -3,7 +3,7 @@
   "short_name": "예산관리",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f0f4f8",
+  "background_color": "#059669",
   "theme_color": "#059669",
   "icons": [
     {

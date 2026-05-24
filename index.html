@@ -14,7 +14,8 @@
   <script src="firebase-config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#f0f4f8; min-height:100vh; color:#1e293b; }
+    body { font-family: 'Segoe UI','Apple SD Gothic Neo',sans-serif; background:#059669; min-height:100vh; color:#1e293b; }
+    body.app-ready { background:#f0f4f8; }
 
     header { background:linear-gradient(135deg,#065f46,#059669); color:white; padding:18px 28px; box-shadow:0 4px 12px rgba(6,95,70,.25); }
     header h1 { font-size:1.25rem; font-weight:700; }
@@ -433,6 +434,7 @@ _auth.onAuthStateChanged(user=>{
   const ui=document.getElementById('userInfo');
   if(user){
     overlay.style.display='none';
+    document.body.classList.add('app-ready');
     ui.innerHTML=`
       ${user.photoURL?`<img src="${user.photoURL}" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`:'' }
       <span style="font-size:.73rem;opacity:.85;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${user.displayName||user.email}</span>
@@ -440,6 +442,7 @@ _auth.onAuthStateChanged(user=>{
     loadData();
   } else {
     overlay.style.display='flex';
+    document.body.classList.remove('app-ready');
     ui.innerHTML='';
     incomeItems=[]; budgetItems=[]; expenseAmounts={}; unexpectedExpenses=[];
   }
