@@ -467,10 +467,12 @@ function setSyncStatus(s){
 }
 
 function applyData(d){
-  incomeItems        = d.incomeItems        || [];
-  budgetItems        = d.budgetItems        || [];
+  // Firebase는 null 필드를 저장 시 삭제하므로, 로드 시 parentId undefined → null 로 정규화
+  const fixNull = arr => (arr||[]).map(i=>({...i, parentId: i.parentId ?? null}));
+  incomeItems        = fixNull(d.incomeItems);
+  budgetItems        = fixNull(d.budgetItems);
+  unexpectedExpenses = fixNull(d.unexpectedExpenses);
   expenseAmounts     = d.expenseAmounts     || {};
-  unexpectedExpenses = d.unexpectedExpenses || [];
   _salary            = d.salary             || 0;
   if(_salary>0 && incomeItems.length===0){
     incomeItems=[{id:_salary*1000+1,purpose:'월급',amount:_salary,parentId:null,order:0}];
@@ -1384,7 +1386,10 @@ function importExcel(input){
       const newBudgetItems=wsB?parseXlItemSheet(wsB):[];
       const {ea,ue}=wsE?parseXlExpenseSheet(wsE,newBudgetItems):{ea:{},ue:[]};
       // 저장
-      localStorage.setItem(`budget_${yr}_${mo}`,JSON.stringify({incomeItems:newIncomeItems,budgetItems:newBudgetItems,expenseAmounts:ea,unexpectedExpenses:ue}));
+      const importedData={incomeItems:newIncomeItems,budgetItems:newBudgetItems,expenseAmounts:ea,unexpectedExpenses:ue,lastSaved:Date.now()};
+      localStorage.setItem(`budget_${yr}_${mo}`,JSON.stringify(importedData));
+      // Firebase에도 즉시 저장해서 리스너가 덮어쓰지 않도록
+      if(_currentUser) _db.ref(`budgetApp/${_currentUser.uid}/budget_${yr}_${mo}`).set(importedData).catch(()=>{});
       document.getElementById('yearSel').value=yr;
       document.getElementById('monthSel').value=parseInt(mo);
       editId=null; unexpEditId=null; loadData();
