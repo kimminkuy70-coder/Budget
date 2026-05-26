@@ -253,6 +253,15 @@
       .right-panel .card{min-height:auto;}
       .exp-row,.exp-total-row{grid-template-columns:24px 1fr 88px 100px 80px;}
     }
+    @media(max-width:620px){
+      .exp-row,.exp-total-row{grid-template-columns:20px 1fr 96px 78px;gap:5px;align-items:start;}
+      .exp-col-budget{display:none;}
+      .exp-name{white-space:normal;word-break:break-word;line-height:1.35;padding:2px 0;}
+      .exp-hdr{font-size:.62rem;}
+      .exp-bamt,.exp-remain,.exp-tact,.exp-trem,.exp-tbamt{font-size:.78rem;}
+      .exp-input{height:28px;font-size:.78rem;padding:0 5px;}
+      .exp-row{padding:7px 4px;}
+    }
   </style>
 </head>
 <body>
@@ -1063,14 +1072,14 @@ function renderExpenseList(){
     <div class="exp-table">
       <div class="exp-row exp-hdr">
         <span>#</span><span>항목</span>
-        <span style="text-align:right">예산</span>
+        <span class="exp-col-budget" style="text-align:right">예산</span>
         <span style="text-align:right">실제 지출</span>
         <span style="text-align:right">잔액</span>
       </div>
       ${rows.map(r=>renderExpRow(r)).join('')}
       <div class="exp-total-row">
         <div class="exp-total-lbl">합계</div>
-        <div class="exp-tbamt" id="etB">${fw(tB)}</div>
+        <div class="exp-tbamt exp-col-budget" id="etB">${fw(tB)}</div>
         <div class="exp-tact" id="etA">${fw(tAU)}</div>
         <div class="exp-trem${tB-tAU<0?' neg':''}" id="etR">${fw(tB-tAU)}</div>
       </div>
@@ -1131,7 +1140,7 @@ function renderExpRow({type,item,depth,sibIdx}){
       ondrop="onDrop(event,${item.id},'budget')">
       <div class="item-num">${num}</div>
       <div class="exp-name" style="${hasKids?'font-weight:700;':''}">${esc(item.purpose)}</div>
-      <div class="exp-bamt">${fw(item.amount)}</div>
+      <div class="exp-bamt exp-col-budget">${fw(item.amount)}</div>
       ${expCell}
       ${remainCell}
     </div>`;
@@ -1153,7 +1162,7 @@ function renderExpRow({type,item,depth,sibIdx}){
       ondrop="onDrop(event,${item.id},'unexp')">
       <div class="item-num unexp">${num}</div>
       <div class="exp-name">${esc(item.purpose)}</div>
-      <div class="exp-bamt" style="color:#cbd5e1">—</div>
+      <div class="exp-bamt exp-col-budget" style="color:#cbd5e1">—</div>
       ${expCell}
       <div style="display:flex;gap:3px;justify-content:flex-end">${btnCell}</div>
     </div>`;
