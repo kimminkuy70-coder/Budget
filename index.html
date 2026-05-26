@@ -254,6 +254,7 @@
       .exp-row,.exp-total-row{grid-template-columns:24px 1fr 88px 100px 80px;}
     }
     @media(max-width:620px){
+      /* 지출 내역 */
       .exp-row,.exp-total-row{grid-template-columns:20px 1fr 96px 78px;gap:5px;align-items:start;}
       .exp-col-budget{display:none;}
       .exp-name{white-space:normal;word-break:break-word;line-height:1.35;padding:2px 0;}
@@ -261,6 +262,18 @@
       .exp-bamt,.exp-remain,.exp-tact,.exp-trem,.exp-tbamt{font-size:.78rem;}
       .exp-input{height:28px;font-size:.78rem;padding:0 5px;}
       .exp-row{padding:7px 4px;}
+
+      /* 수입 / 예산 항목 */
+      .tree-item{padding:9px 10px;gap:6px;align-items:flex-start;}
+      .drag-handle{padding-top:2px;}
+      .item-num{margin-top:1px;}
+      .item-purpose{white-space:normal;word-break:break-word;font-size:.85rem;padding-top:1px;}
+      .item-pct{display:none;}
+      .item-amt{font-size:.83rem;padding-top:1px;}
+
+      /* 월별 현금 흐름 */
+      .stat-col-chart{display:none;}
+      .stat-row td,.stat-hdr th{padding:7px 8px;font-size:.78rem;}
     }
   </style>
 </head>
@@ -1224,7 +1237,7 @@ function renderStatsView(){
     <table class="stat-table">
       <thead class="stat-hdr"><tr>
         <th style="text-align:left">월</th>
-        <th>수입</th><th>지출</th><th>잔액</th><th style="min-width:120px">현황</th>
+        <th>수입</th><th>지출</th><th>잔액</th><th class="stat-col-chart" style="min-width:120px">현황</th>
       </tr></thead>
       <tbody>
         ${rows.map(r=>{
@@ -1236,7 +1249,7 @@ function renderStatsView(){
             <td class="c-green">${fw(r.income)}</td>
             <td class="c-red">${fw(r.spent)}</td>
             <td class="${r.remain<0?'c-red':'c-blue'}">${fw(r.remain)}</td>
-            <td>
+            <td class="stat-col-chart">
               <div style="font-size:.7rem;color:#94a3b8;text-align:right;margin-bottom:3px">${pct.toFixed(1)}% 사용</div>
               <div class="stat-bars">
                 <div class="stat-bar-row"><span class="stat-bar-lbl">수입</span><div class="stat-bar-bg"><div class="stat-bar-fill income" style="width:${iW}%"></div></div></div>
