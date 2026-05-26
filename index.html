@@ -607,7 +607,7 @@ function loadData(){
       firstFire = false;
       if(d && (d.lastSaved||0) > localTs){
         applyData(d);
-        localStorage.setItem(key, JSON.stringify(d));
+        localStorage.setItem(key, JSON.stringify({incomeItems,budgetItems,expenseAmounts,unexpectedExpenses,lastSaved:d.lastSaved||0}));
         renderAll();
         toast('☁️ 클라우드에서 최신 데이터를 불러왔습니다.');
       }
@@ -618,7 +618,7 @@ function loadData(){
     if(!d) return;
     if(editId||unexpEditId||budgetExpEditId) return;
     applyData(d);
-    localStorage.setItem(key, JSON.stringify(d));
+    localStorage.setItem(key, JSON.stringify({incomeItems,budgetItems,expenseAmounts,unexpectedExpenses,lastSaved:d.lastSaved||0}));
     renderAll();
     setSyncStatus('updated');
     toast('📱 다른 기기에서 변경사항이 적용되었습니다.');
@@ -1210,9 +1210,9 @@ function renderStatsView(){
     if(!raw){rows.push({m,empty:true});continue;}
     try{
       const d=JSON.parse(raw);
-      const income=(d.incomeItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
-      const spent=(d.budgetItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+((d.expenseAmounts||{})[i.id]||0),0)
-                 +(d.unexpectedExpenses||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0);
+      const income=(d.incomeItems||[]).filter(i=>i.parentId==null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
+      const spent=(d.budgetItems||[]).filter(i=>i.parentId==null).reduce((s,i)=>s+((d.expenseAmounts||{})[i.id]||0),0)
+                 +(d.unexpectedExpenses||[]).filter(i=>i.parentId==null).reduce((s,i)=>s+i.amount,0);
       maxVal=Math.max(maxVal,income,spent);
       rows.push({m,income,spent,remain:income-spent,empty:false});
     }catch{rows.push({m,empty:true});}
