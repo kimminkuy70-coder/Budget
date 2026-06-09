@@ -547,9 +547,9 @@ function getCarryover(){
   try{
     const d=JSON.parse(raw);
     const bi=d.budgetItems||[], ea=d.expenseAmounts||{}, ue=d.unexpectedExpenses||[];
-    const prevIncome=(d.incomeItems||[]).filter(i=>i.parentId===null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
-    const act=bi.filter(i=>i.parentId===null).reduce((s,i)=>s+(ea[i.id]||0),0);
-    const unexp=ue.reduce((s,i)=>s+i.amount,0);
+    const prevIncome=(d.incomeItems||[]).filter(i=>i.parentId==null).reduce((s,i)=>s+i.amount,0)||(d.salary||0);
+    const act=bi.filter(i=>i.parentId==null).reduce((s,i)=>s+(ea[i.id]||0),0);
+    const unexp=ue.filter(i=>i.parentId==null).reduce((s,i)=>s+i.amount,0);
     return prevIncome-act-unexp;
   }catch{ return 0; }
 }
@@ -875,10 +875,11 @@ function renderModeUI(){
   incomeSec.style.display=(ib||ie)?'':'none';
   if(ib||ie) document.getElementById('incomeTotalVal').textContent=fw(totalIncome());
 
-  // 이월 (수입·통계 모드 제외)
+  // 이월 (수입·통계 모드 제외, 현재 달 데이터가 있을 때만)
   const co=getCarryover();
   const coSec=document.getElementById('coSec');
-  coSec.style.display=(!ii&&!is&&co!==0)?'':'none';
+  const hasCurrentData=incomeItems.length>0||budgetItems.length>0||unexpectedExpenses.length>0||Object.keys(expenseAmounts).length>0;
+  coSec.style.display=(!ii&&!is&&co!==0&&hasCurrentData)?'':'none';
   if(!ii&&!is&&co!==0){
     document.getElementById('coVal').textContent=fw(co);
     document.getElementById('coBox').className='carryover-box'+(co<0?' neg':'');
